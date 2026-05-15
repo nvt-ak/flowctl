@@ -73,6 +73,7 @@ FLOWCTL_HOME="${FLOWCTL_HOME:-$_home_native/.flowctl}"
 # Grep-based parsing was fragile (broke on extra whitespace / multiline values).
 _fl_id=""
 _fl_name=""
+_fl_short=""
 if [[ -f "$STATE_FILE" ]]; then
   _fl_parsed=$(WF_SF="$STATE_FILE" python3 - <<'PY' 2>/dev/null
 import json, os

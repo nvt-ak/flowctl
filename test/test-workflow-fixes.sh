@@ -305,6 +305,63 @@ PY
 [[ $? -eq 0 ]] && PASS=$((PASS+1)) || FAIL=$((FAIL+1))
 
 # ============================================================
+# FIX 7: config.sh — _fl_short must be bound under set -u when flow_id empty
+# Bug: _fl_short was only set inside `if [[ -n "$_fl_id" ]]`, so pre-init
+#      projects hit `_fl_short` unbound at DISPATCH_BASE resolution →
+#      "line 135: _fl_short: unbound variable" with set -u (e.g. setup.sh).
+# ============================================================
+log ""
+log "=== FIX 7: config.sh sources cleanly with set -u (empty vs set flow_id) ==="
+
+_cfg_proj="$(mktemp -d "$TEST_DIR/cfg-nounset-XXXXXX")"
+_cfg_home="$(mktemp -d "$TEST_DIR/cfg-home-XXXXXX")"
+mkdir -p "$_cfg_proj"
+python3 -c "import json, pathlib; pathlib.Path(r'$_cfg_proj/flowctl-state.json').write_text(json.dumps({'flow_id':'','project_name':'NounsetPreInit','current_step':1,'overall_status':'pending'}), encoding='utf-8')"
+
+_cfg_nounset_empty() {
+  (
+    set -euo pipefail
+    unset FLOWCTL_STATE_FILE FLOWCTL_ACTIVE_FLOW || true
+    export PROJECT_ROOT="$1"
+    export FLOWCTL_HOME="$2"
+    # shellcheck disable=SC1091
+    source "$REPO_ROOT/scripts/workflow/lib/config.sh"
+    [[ "$DISPATCH_BASE" == "$PROJECT_ROOT/workflows/dispatch" ]]
+    [[ "$GATE_REPORTS_DIR" == "$PROJECT_ROOT/workflows/gates/reports" ]]
+    [[ "$RETRO_DIR" == "$PROJECT_ROOT/workflows/retro" ]]
+  )
+}
+
+if _cfg_nounset_empty "$_cfg_proj" "$_cfg_home"; then
+  pass "config.sh + set -u: empty flow_id uses legacy DISPATCH_* paths"
+else
+  fail "config.sh + set -u: empty flow_id (expected legacy paths, no unbound _fl_short)"
+fi
+
+_cfg_proj2="$(mktemp -d "$TEST_DIR/cfg-nounset2-XXXXXX")"
+_cfg_home2="$(mktemp -d "$TEST_DIR/cfg-home2-XXXXXX")"
+mkdir -p "$_cfg_proj2"
+python3 -c "import json, pathlib; pathlib.Path(r'$_cfg_proj2/flowctl-state.json').write_text(json.dumps({'flow_id':'wf-abcdef12-0000-0000-0000-000000000001','project_name':'NounsetWithFlow','current_step':1,'overall_status':'pending'}), encoding='utf-8')"
+
+_cfg_nounset_with_flow() {
+  (
+    set -euo pipefail
+    unset FLOWCTL_STATE_FILE FLOWCTL_ACTIVE_FLOW || true
+    export PROJECT_ROOT="$1"
+    export FLOWCTL_HOME="$2"
+    # shellcheck disable=SC1091
+    source "$REPO_ROOT/scripts/workflow/lib/config.sh"
+    [[ "$DISPATCH_BASE" == "$PROJECT_ROOT/workflows/abcdef12/dispatch" ]]
+  )
+}
+
+if _cfg_nounset_with_flow "$_cfg_proj2" "$_cfg_home2"; then
+  pass "config.sh + set -u: non-empty flow_id uses per-flow DISPATCH_BASE"
+else
+  fail "config.sh + set -u: per-flow DISPATCH_BASE mismatch"
+fi
+
+# ============================================================
 # Summary
 # ============================================================
 log ""

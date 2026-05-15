@@ -77,7 +77,8 @@
     "release:minor": "npm version minor",
     "release:major": "npm version major",
     "release:push": "git push -u origin HEAD --follow-tags",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:fixes": "bash test/test-workflow-fixes.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0"
