@@ -12,4 +12,12 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 WORKFLOW_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+if [[ "${FLOWCTL_ENGINE:-}" == "ts" ]]; then
+  if command -v bun >/dev/null 2>&1; then
+    exec bun run "$WORKFLOW_ROOT/src/cli/index.ts" "$@"
+  fi
+  echo "[flowctl] FLOWCTL_ENGINE=ts requires bun on PATH" >&2
+  exit 1
+fi
+
 exec bash "$WORKFLOW_ROOT/scripts/flowctl.sh" "$@"
