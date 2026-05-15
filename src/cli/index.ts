@@ -16,6 +16,13 @@ import { runDispatch } from "@/commands/dispatch/index";
 import { runCursorDispatch } from "@/commands/cursor-dispatch/index";
 import { runFlow } from "@/commands/flow/index";
 import { runFork } from "@/commands/fork";
+import { runCollect } from "@/commands/collect";
+import { runComplexity } from "@/commands/complexity";
+import { runBudgetStatus } from "@/commands/budget";
+import { runWarRoom } from "@/commands/war-room/index";
+import { runWarRoomMerge } from "@/commands/war-room/merge";
+import { runMercenary } from "@/commands/mercenary/index";
+import { runTeam, type TeamRecoverOptions } from "@/commands/team/index";
 import { acquireFlowLock } from "@/utils/lock";
 
 const pkg = JSON.parse(
@@ -284,6 +291,195 @@ flowCmd
     const ctx = await getContext();
     await runFlow(ctx, "switch", [flowId]);
   });
+
+program
+  .command("collect")
+  .description("Collect worker reports into workflow state")
+  .action(async () => {
+    await runCommand("collect", runCollect);
+  });
+
+program
+  .command("complexity")
+  .description("Score step complexity and War Room hints")
+  .action(async () => {
+    await runCommand("complexity", runComplexity);
+  });
+
+program
+  .command("budget")
+  .description("Budget breaker status")
+  .action(async () => {
+    const ctx = await getContext();
+    try {
+      await runBudgetStatus(ctx);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(message);
+      process.exitCode = 1;
+    }
+  });
+
+const warRoomCmd = program
+  .command("war-room")
+  .alias("wr")
+  .description("War Room protocol (PM + Tech Lead)");
+
+warRoomCmd
+  .command("merge")
+  .description("Merge War Room outputs into context-digest.md")
+  .action(async () => {
+    await runCommand("war-room", runWarRoomMerge);
+  });
+
+warRoomCmd.action(async () => {
+  await runCommand("war-room", runWarRoom);
+});
+
+const mercenaryCmd = program
+  .command("mercenary")
+  .alias("merc")
+  .description("Mercenary pool (scan / spawn)");
+
+mercenaryCmd
+  .command("scan")
+  .description("Scan reports for NEEDS_SPECIALIST")
+  .action(async () => {
+    await runCommand("mercenary", (ctx) => runMercenary(ctx, "scan"));
+  });
+
+mercenaryCmd
+  .command("spawn")
+  .description("Spawn mercenary board from scan results")
+  .option("--timeout <seconds>", "Mercenary timeout hint", (v) => Number(v))
+  .action(async (opts: { timeout?: number }) => {
+    await runCommand("mercenary", (ctx) =>
+      runMercenary(ctx, "spawn", { timeout: opts.timeout }),
+    );
+  });
+
+mercenaryCmd.action(async () => {
+  await runCommand("mercenary", (ctx) => runMercenary(ctx, "scan"));
+});
+
+const teamCmd = program.command("team").description("PM team orchestration");
+
+const teamDispatchOpts = (opts: Record<string, string | boolean | undefined>) => ({
+  launch: opts.launch === true,
+  headless: opts.headless === true,
+  trust: opts.trust === true,
+  dryRun: opts.dryRun === true,
+  forceRun: opts.forceRun === true,
+  maxRetries: typeof opts.maxRetries === "string" ? opts.maxRetries : undefined,
+  role: typeof opts.role === "string" ? opts.role : undefined,
+});
+
+const dispatchPassThrough = [
+  ["--launch", "Pass through to dispatch"],
+  ["--headless", "Pass through to dispatch"],
+  ["--trust", "Pass through to dispatch"],
+  ["--dry-run", "Pass through to dispatch"],
+  ["--force-run", "Pass through to dispatch"],
+  ["--max-retries <n>", "Pass through to dispatch"],
+  ["--role <name>", "Pass through to dispatch"],
+] as const;
+
+function addDispatchPassThrough(cmd: ReturnType<typeof teamCmd.command>) {
+  for (const [flag, desc] of dispatchPassThrough) {
+    cmd.option(flag, desc);
+  }
+  return cmd;
+}
+
+addDispatchPassThrough(
+  teamCmd.command("start").description("Start step and delegate headless"),
+).action(async (opts: Record<string, string | boolean | undefined>) => {
+  await runCommand("team", (ctx) => runTeam(ctx, "start", teamDispatchOpts(opts)));
+});
+
+addDispatchPassThrough(
+  teamCmd.command("delegate").description("Delegate headless workers"),
+).action(async (opts: Record<string, string | boolean | undefined>) => {
+  await runCommand("team", (ctx) =>
+    runTeam(ctx, "delegate", teamDispatchOpts(opts)),
+  );
+});
+
+teamCmd
+  .command("sync")
+  .description("Collect reports and print summary")
+  .action(async () => {
+    await runCommand("team", (ctx) => runTeam(ctx, "sync"));
+  });
+
+teamCmd
+  .command("status")
+  .description("Team status + summary")
+  .action(async () => {
+    await runCommand("team", (ctx) => runTeam(ctx, "status"));
+  });
+
+teamCmd
+  .command("monitor")
+  .description("Monitor worker status (simplified)")
+  .option("--stale-seconds <n>", "Stale threshold", (v) => Number(v))
+  .option("--retry-delay-seconds <n>", "Retry delay hint", (v) => Number(v))
+  .option("--stale-pids", "Clean stale PIDs (bash only)")
+  .action(async (opts: {
+    staleSeconds?: number;
+    retryDelaySeconds?: number;
+    stalePids?: boolean;
+  }) => {
+    await runCommand("team", (ctx) =>
+      runTeam(ctx, "monitor", {}, {
+        monitor: {
+          staleSeconds: opts.staleSeconds,
+          retryDelaySeconds: opts.retryDelaySeconds,
+          cleanStalePids: opts.stalePids === true,
+        },
+      }),
+    );
+  });
+
+teamCmd
+  .command("recover")
+  .description("Recover a stuck role")
+  .requiredOption("--role <name>", "Role to recover")
+  .option("--mode <mode>", "resume|retry|rollback", "retry")
+  .option("--dry-run", "Dry run")
+  .action(async (opts: { role: string; mode?: string; dryRun?: boolean }) => {
+    await runCommand("team", (ctx) =>
+      runTeam(ctx, "recover", {}, {
+        recover: {
+          role: opts.role,
+          mode: (opts.mode as TeamRecoverOptions["mode"]) ?? "retry",
+          dryRun: opts.dryRun === true,
+        },
+      }),
+    );
+  });
+
+teamCmd
+  .command("budget-reset")
+  .description("Reset budget breaker")
+  .option("--reason <text>", "Reset reason")
+  .action(async (opts: { reason?: string }) => {
+    await runCommand("team", (ctx) =>
+      runTeam(ctx, "budget-reset", {}, {
+        budgetResetReason: opts.reason,
+      }),
+    );
+  });
+
+addDispatchPassThrough(
+  teamCmd.command("run").description("Single delegate cycle"),
+).action(async (opts: Record<string, string | boolean | undefined>) => {
+  await runCommand("team", (ctx) => runTeam(ctx, "run", teamDispatchOpts(opts)));
+});
+
+teamCmd.action(async () => {
+  await runCommand("team", (ctx) => runTeam(ctx, "status"));
+});
 
 program
   .command("fork")

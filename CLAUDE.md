@@ -27,7 +27,7 @@ Chi tiết đầy đủ (MCP danh sách, skip presets, approval template, parall
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **flowctl** (2139 symbols, 2723 relationships, 29 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **flowctl** (3861 symbols, 5901 relationships, 177 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
