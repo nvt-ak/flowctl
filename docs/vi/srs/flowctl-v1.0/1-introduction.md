@@ -2,7 +2,7 @@
 
 ### 1.1 Document Purpose
 
-**Product Name:** flowctl (`@cursor/flowctl` — mô tả wiki)
+**Product Name:** flowctl (`@cursor-kit/flowctl` — mô tả wiki)
 
 **Document Version:** v1.0
 

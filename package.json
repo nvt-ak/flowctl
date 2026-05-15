@@ -1,5 +1,5 @@
 {
-  "name": "@cursor/flowctl",
+  "name": "@cursor-kit/flowctl",
   "version": "0.0.1",
   "type": "module",
   "description": "Workflow Orchestration for Cursor",
