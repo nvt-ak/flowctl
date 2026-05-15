@@ -30,8 +30,10 @@ describe("blocker reconcile + unskip (bash parity)", () => {
     state.flow_id = "wf-12345678-abcd-ef00-000000000000";
     state.project_name = "Demo";
     state.current_step = 1;
+    const step1 = state.steps["1"];
+    if (!step1) throw new Error("fixture: missing step 1");
     state.steps["1"] = {
-      ...state.steps["1"],
+      ...step1,
       name: "Requirements",
       agent: "pm",
       status: "in_progress",
@@ -122,8 +124,10 @@ describe("blocker reconcile + unskip (bash parity)", () => {
       JSON.parse(await readFile(stateFile, "utf-8")),
     );
     st.current_step = 5;
+    const step3 = st.steps["3"];
+    if (!step3) throw new Error("fixture: missing step 3");
     st.steps["3"] = {
-      ...st.steps["3"]!,
+      ...step3,
       status: "skipped",
       skip_reason: "test",
       skip_type: "hotfix",

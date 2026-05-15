@@ -32,8 +32,10 @@ describe("Phase 3 week 4 — plan, history, release-dashboard, reset", () => {
     state.flow_id = "wf-12345678-abcd-ef00-000000000000";
     state.project_name = "Demo";
     state.current_step = 1;
+    const step1 = state.steps["1"];
+    if (!step1) throw new Error("fixture: missing step 1");
     state.steps["1"] = {
-      ...state.steps["1"],
+      ...step1,
       name: "Requirements",
       agent: "pm",
       status: "in_progress",
@@ -96,8 +98,10 @@ describe("Phase 3 week 4 — plan, history, release-dashboard, reset", () => {
       JSON.parse(await readFile(stateFile, "utf-8")),
     );
     cur.current_step = 2;
+    const step2 = cur.steps["2"];
+    if (!step2) throw new Error("fixture: missing step 2");
     cur.steps["2"] = {
-      ...cur.steps["2"],
+      ...step2,
       name: "Design",
       status: "completed",
       blockers: [{ id: "b1", description: "x", created_at: "t", resolved: false }],
