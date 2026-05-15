@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "_comment": "Copied to workflows/policies on init if missing",
+  "defaults": {
+    "allow_trust": false,
+    "allowed_modes": ["manual", "headless", "launch"]
+  },
+  "roles": {
+    "pm": { "allow_trust": false },
+    "tech-lead": { "allow_trust": false },
+    "backend": { "allow_trust": false },
+    "frontend": { "allow_trust": false },
+    "ui-ux": { "allow_trust": false },
+    "qa": { "allow_trust": false },
+    "devops": { "allow_trust": false }
+  }
+}

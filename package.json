@@ -1,0 +1,93 @@
+{
+  "name": "@cursor/flowctl",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Workflow Orchestration for Cursor",
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nvt-ak/flowctl.git"
+  },
+  "author": "Tai Nguyen Van",
+  "license": "MIT",
+  "homepage": "https://github.com/nvt-ak/flowctl",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "keywords": [
+    "flowctl",
+    "workflow",
+    "mcp",
+    "cursor",
+    "workflow-orchestration",
+    "workflow-orchestration-mcp",
+    "workflow-orchestration-mcp-server",
+    "workflow-orchestration-mcp-server-shell-proxy",
+    "workflow-orchestration-mcp-server-workflow-state",
+    "shell-proxy",
+    "workflow-state"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin",
+    "scripts/flowctl.sh",
+    "scripts/setup.sh",
+    "scripts/merge_cursor_mcp.py",
+    "scripts/monitor-web.py",
+    "scripts/token-audit.py",
+    "scripts/hooks",
+    "scripts/workflow",
+    "templates",
+    "workflows/dispatch",
+    "workflows/gates",
+    "workflows/policies",
+    ".cursor/agents",
+    ".cursor/commands",
+    ".cursor/rules",
+    ".cursor/skills",
+    ".cursorrules"
+  ],
+  "devDependencies": {
+    "husky": "^9.1.7"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run setup-hooks"
+    }
+  },
+  "bin": {
+    "flowctl": "bin/flowctl"
+  },
+  "scripts": {
+    "setup-hooks": "node scripts/hooks/setup-git-hooks.mjs",
+    "flowctl": "flowctl",
+    "test": "bash test/test-package-files.sh && bash test/test-merge-cursor-mcp.sh && bash test/test-workflow-tdd-regression.sh && bash test/test-complexity-war-room.sh",
+    "test:package": "bash test/test-package-files.sh",
+    "test:merge-mcp": "bash test/test-merge-cursor-mcp.sh",
+    "test:tdd": "bash test/test-workflow-tdd-regression.sh",
+    "test:e2e": "bash test/test-workflow-e2e.sh",
+    "test:gate:local": "bash scripts/hooks/run-quality-gate.sh --mode local",
+    "test:ci": "bash scripts/hooks/run-quality-gate.sh --mode ci",
+    "test:complexity": "bash test/test-complexity-war-room.sh",
+    "test:ci:core": "npm run test:package && npm run test:merge-mcp && npm run test:tdd && npm run test:fixes && npm run test:complexity",
+    "release:patch": "npm version patch",
+    "release:minor": "npm version minor",
+    "release:major": "npm version major",
+    "release:push": "git push -u origin HEAD --follow-tags",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  },
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
+  },
+  "bugs": {
+    "url": "https://github.com/nvt-ak/flowctl/issues"
+  }
+}

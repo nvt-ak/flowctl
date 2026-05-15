@@ -1,0 +1,53 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash scripts/setup.sh*)",
+      "Bash(flowctl*)",
+      "Bash(bash scripts/hooks/invalidate-cache.sh*)",
+      "Bash(node scripts/hooks/setup-git-hooks.mjs*)",
+      "Bash(python3 scripts/monitor.py*)",
+      "Bash(python3 scripts/hooks/*.py*)",
+      "Bash(pip install graphifyy*)",
+      "Bash(pip3 install graphifyy*)",
+      "Bash(python3 -m graphify*)",
+      "Bash(npx gitnexus*)",
+      "Bash(flowctl mcp --shell-proxy*)",
+      "Bash(flowctl mcp --workflow-state*)",
+      "Bash(cat flowctl-state.json)",
+      "Bash(python3 * flowctl-state.json*)",
+      "Bash(python3 *merge_cursor_mcp.py*)",
+      "Bash(chmod +x scripts/setup.sh)",
+      "Bash(chmod +x scripts/flowctl.sh)",
+      "Bash(chmod +x scripts/hooks/*.sh)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "flowctl hook invalidate-cache state 2>/dev/null || true",
+            "statusMessage": "Refreshing flowctl cache..."
+          },
+          {
+            "type": "command",
+            "command": "flowctl hook session-start 2>/dev/null || true",
+            "statusMessage": "Loading flowctl state..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "flowctl hook log-bash-event 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

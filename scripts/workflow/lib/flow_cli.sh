@@ -1,0 +1,225 @@
+#!/usr/bin/env bash
+# Multi-flow CLI: list / new / switch — state files under .flowctl/flows/ + .flowctl/flows.json
+
+FLOWCTL_FLOWS_JSON="$REPO_ROOT/.flowctl/flows.json"
+
+# If legacy flowctl-state.json exists at repo root and no index yet, move it into .flowctl/flows/<short>/ (preserve flow_id).
+_flow_migrate_legacy_root_if_needed() {
+  [[ -f "$FLOWCTL_FLOWS_JSON" ]] && return 0
+  local root_s="$REPO_ROOT/flowctl-state.json"
+  [[ -f "$root_s" ]] || return 0
+  [[ -L "$root_s" ]] && return 0
+  WF_REPO="$REPO_ROOT" WF_ROOT_STATE="$root_s" python3 - <<'PY' || true
+import json, os, shutil
+from pathlib import Path
+repo = Path(os.environ["WF_REPO"])
+root = Path(os.environ["WF_ROOT_STATE"])
+try:
+    data = json.loads(root.read_text(encoding="utf-8"))
+except Exception:
+    raise SystemExit(0)
+fid = (data.get("flow_id") or "").strip()
+if not fid or not fid.startswith("wf-"):
+    raise SystemExit(0)
+short = fid.replace("wf-", "").replace("-", "")[:8] or "legacy"
+dest_dir = repo / ".flowctl" / "flows" / short
+dest_dir.mkdir(parents=True, exist_ok=True)
+dest = dest_dir / "state.json"
+if dest.is_file():
+    raise SystemExit(0)
+rel = str(dest.relative_to(repo))
+shutil.move(str(root), str(dest))
+idx = {"version": 1, "active_flow_id": fid, "flows": {fid: {"state_file": rel, "label": "migrated-root"}}}
+(repo / ".flowctl" / "flows.json").parent.mkdir(parents=True, exist_ok=True)
+(repo / ".flowctl" / "flows.json").write_text(json.dumps(idx, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+print(f"Migrated legacy state to {dest} (flow {fid})")
+PY
+}
+
+cmd_flow_list() {
+  if [[ ! -f "$FLOWCTL_FLOWS_JSON" ]]; then
+    wf_info "Chưa có .flowctl/flows.json — đang dùng state mặc định: flowctl-state.json"
+    wf_info "STATE_FILE (resolved): $STATE_FILE"
+    return 0
+  fi
+  python3 - "$FLOWCTL_FLOWS_JSON" "$STATE_FILE" <<'PY'
+import json, sys
+from pathlib import Path
+flows_p = Path(sys.argv[1])
+state_res = Path(sys.argv[2])
+idx = json.loads(flows_p.read_text(encoding="utf-8"))
+active = idx.get("active_flow_id", "")
+print("active_flow_id:", active)
+print("resolved_state_file:", state_res)
+print("flows:")
+for fid, meta in sorted((idx.get("flows") or {}).items()):
+    if not isinstance(meta, dict):
+        continue
+    lab = meta.get("label") or ""
+    sf = meta.get("state_file", "")
+    mark = " <-- active" if fid == active else ""
+    print(f"  {fid}  label={lab!r}  state_file={sf}{mark}")
+PY
+}
+
+cmd_flow_switch() {
+  wf_acquire_flow_lock
+  local target="${1:-}"
+  if [[ -z "$target" ]]; then
+    wf_error "Thiếu flow id (prefix wf-... hoặc 8 ký tự hex)."
+    wf_info "Usage: flowctl flow switch <flow_id_or_prefix>"
+    exit 1
+  fi
+  [[ -f "$FLOWCTL_FLOWS_JSON" ]] || { wf_error "Không tìm thấy $FLOWCTL_FLOWS_JSON — chạy: flowctl flow new trước"; exit 1; }
+  local _py_rc=0
+  WF_FLOWS_JSON="$FLOWCTL_FLOWS_JSON" WF_TARGET="$target" python3 - <<'PY' || _py_rc=$?
+import json, os, sys
+from pathlib import Path
+p = Path(os.environ["WF_FLOWS_JSON"])
+target = os.environ["WF_TARGET"].strip()
+idx = json.loads(p.read_text(encoding="utf-8"))
+flows = idx.get("flows") or {}
+keys = list(flows.keys())
+match = None
+if target in flows:
+    match = target
+else:
+    tnd = target.replace("wf-", "").replace("-", "")
+    for k in keys:
+        knd = k.replace("wf-", "").replace("-", "")
+        if k == target or k.startswith(target) or (tnd and (knd.startswith(tnd) or k.startswith("wf-" + tnd[:8]))):
+            match = k
+            break
+    if not match and tnd:
+        for k in keys:
+            if tnd in k.replace("wf-", "").replace("-", ""):
+                match = k
+                break
+if not match:
+    print(f"No flow matches {target!r}. Known: {keys}", file=sys.stderr)
+    sys.exit(1)
+idx["active_flow_id"] = match
+p.write_text(json.dumps(idx, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+print(f"active_flow_id set to {match}")
+PY
+  [[ "$_py_rc" -eq 0 ]] || exit "$_py_rc"
+  _flow_try_symlink_active
+  wf_success "Đã switch flow. MCP/terminal mới: export FLOWCTL_ACTIVE_FLOW= hoặc reload; wf_state đọc từ resolve."
+}
+
+# Symlink REPO_ROOT/flowctl-state.json -> active flow state (Unix); best-effort.
+_flow_try_symlink_active() {
+  [[ -f "$FLOWCTL_FLOWS_JSON" ]] || return 0
+  local rel abs
+  rel="$(python3 -c "
+import json
+p='$FLOWCTL_FLOWS_JSON'
+d=json.load(open(p,encoding='utf-8'))
+a=d.get('active_flow_id') or ''
+print((d.get('flows') or {}).get(a, {}).get('state_file', '') or '')
+")" 2>/dev/null || return 0
+  [[ -n "$rel" ]] || return 0
+  abs="$REPO_ROOT/$rel"
+  if command -v ln &>/dev/null && [[ -f "$abs" ]]; then
+    rm -f "$REPO_ROOT/flowctl-state.json" 2>/dev/null || true
+    (cd "$REPO_ROOT" && ln -sf "$rel" flowctl-state.json) 2>/dev/null || true
+  fi
+}
+
+cmd_flow_new() {
+  wf_acquire_flow_lock
+  local label="" proj_name=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --label) label="${2:-}"; shift 2 ;;
+      --project) proj_name="${2:-}"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  if [[ -z "$proj_name" && -f "$STATE_FILE" ]]; then
+    proj_name="$(python3 -c "import json;print(json.load(open('$STATE_FILE',encoding='utf-8')).get('project_name','') or '')" 2>/dev/null || true)"
+  fi
+  _flow_migrate_legacy_root_if_needed
+  mkdir -p "$REPO_ROOT/.flowctl"
+  local template_state="$WORKFLOW_ROOT/templates/flowctl-state.template.json"
+  [[ -f "$template_state" ]] || { wf_error "Thiếu template: $template_state"; exit 1; }
+
+  if [[ -z "$proj_name" ]]; then
+    proj_name="Project"
+  fi
+  local out_json
+  out_json="$(
+    WF_TEMPLATE="$template_state" WF_LABEL="$label" WF_PROJECT_NAME="$proj_name" python3 - <<'PY'
+import json, os, uuid, datetime
+from pathlib import Path
+tpl = Path(os.environ["WF_TEMPLATE"])
+proj = os.environ.get("WF_PROJECT_NAME", "Project").strip() or "Project"
+label = os.environ.get("WF_LABEL", "").strip()
+flow_id = f"wf-{uuid.uuid4()}"
+short = str(uuid.uuid4()).replace("-", "")[:10]
+data = json.loads(tpl.read_text(encoding="utf-8"))
+data["flow_id"] = flow_id
+data["project_name"] = proj
+if label:
+    data["project_description"] = label
+now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+data["created_at"] = data.get("created_at") or now
+data["updated_at"] = now
+print(json.dumps({"flow_id": flow_id, "short": short, "state": data}, ensure_ascii=False))
+PY
+  )" || { wf_error "flow new: python scaffold failed"; exit 1; }
+
+  local fid short rel dest
+  fid="$(echo "$out_json" | python3 -c "import json,sys;print(json.load(sys.stdin)['flow_id'])")"
+  short="$(echo "$out_json" | python3 -c "import json,sys;print(json.load(sys.stdin)['short'])")"
+  rel=".flowctl/flows/$short/state.json"
+  dest="$REPO_ROOT/$rel"
+  mkdir -p "$(dirname "$dest")"
+  echo "$out_json" | python3 -c "import json,sys;json.dump(json.load(sys.stdin)['state'],open(sys.argv[1],'w',encoding='utf-8'),indent=2,ensure_ascii=False)" "$dest"
+
+  if [[ ! -f "$FLOWCTL_FLOWS_JSON" ]]; then
+    WF_FLOWS_JSON="$FLOWCTL_FLOWS_JSON" WF_FID="$fid" WF_REL="$rel" WF_LABEL="$label" python3 - <<'PY'
+import json, os
+from pathlib import Path
+p = Path(os.environ["WF_FLOWS_JSON"])
+fid = os.environ["WF_FID"]
+rel = os.environ["WF_REL"]
+label = os.environ.get("WF_LABEL", "").strip()
+idx = {"version": 1, "active_flow_id": fid, "flows": {fid: {"state_file": rel, "label": label}}}
+p.parent.mkdir(parents=True, exist_ok=True)
+p.write_text(json.dumps(idx, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+PY
+  else
+    WF_FLOWS_JSON="$FLOWCTL_FLOWS_JSON" WF_FID="$fid" WF_REL="$rel" WF_LABEL="$label" python3 - <<'PY'
+import json, os
+from pathlib import Path
+p = Path(os.environ["WF_FLOWS_JSON"])
+fid = os.environ["WF_FID"]
+rel = os.environ["WF_REL"]
+label = os.environ.get("WF_LABEL", "").strip()
+idx = json.loads(p.read_text(encoding="utf-8"))
+idx.setdefault("flows", {})[fid] = {"state_file": rel, "label": label}
+idx["active_flow_id"] = fid
+p.write_text(json.dumps(idx, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+PY
+  fi
+
+  _flow_try_symlink_active
+  wf_success "flow mới: $fid → $dest (active). Resolver: .flowctl/flows.json"
+  wf_info "Song song: terminal khác → export FLOWCTL_STATE_FILE=$dest"
+}
+
+cmd_flow() {
+  local sub="${1:-list}"
+  shift || true
+  case "$sub" in
+    list|ls) cmd_flow_list ;;
+    new) cmd_flow_new "$@" ;;
+    switch|sw) cmd_flow_switch "$@" ;;
+    *)
+      wf_error "Subcommand flow không hợp lệ: $sub"
+      wf_info "Usage: flowctl flow list | flowctl flow new [--label L] [--project N] | flowctl flow switch <flow_id>"
+      exit 1
+      ;;
+  esac
+}

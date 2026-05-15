@@ -1,0 +1,61 @@
+---
+description: PR review, merge gates, comment taxonomy; use templates during collect/review
+alwaysApply: true
+---
+
+# Review Rules — Code Review & PR
+
+Version: 4.0.0 | Updated: 2026-05-13 | Applies to: all agents
+
+## 1. Review types & SLAs
+
+| Review type | Applies to | Reviewers | SLA |
+|------------|------------|-------------|-----|
+| Step review | After each step | PM + Tech Lead (+ step-specific) | 24–48h |
+| Code review (PR) | Each PR | Tech Lead (mandatory) + 1 peer | 24h |
+| Design review | Steps 3, 5 | UI/UX + Frontend | 24h |
+| Security review | Steps 2, 4, 8 | Tech Lead + DevOps | 48h |
+| UAT | Step 9 | PM + stakeholders | 3–5d |
+
+**Artifacts:** Per-step criteria → `templates/review-checklists-per-step.md`. Approval format → `templates/approval-request-template.md`. Review quick ref → `.cursor/skills/core/code-review/SKILL.md`. Deep checklists and examples → topic files under `.cursor/skills/core/code-review/references/` (see hub table in `SKILL.md`; manifest `lazy` — load only what you need).
+
+## 2. Tech Lead review — must pass
+
+- Architecture matches agreed design; SOLID; no circular dependencies
+- Security: input validation, auth/authz, no injection or sensitive data exposure
+- Quality: single responsibility, DRY, clear naming, explicit errors, no PII in logs
+- Performance: no N+1; sensible caching; no blocking hot paths
+- Tests: business logic covered; coverage meets `core-rules.mdc` gates; edge cases for critical paths
+- Docs: public APIs documented; complex logic commented; README/ADR when behavior changes
+
+## 3. PR size & response SLA
+
+| PR size | SLA |
+|---------|-----|
+| Small (under 100 lines) | 4h |
+| Medium (100–300 lines) | 8h |
+| Large (300–500 lines) | 24h |
+| Very large (over 500 lines) | Split before review |
+
+## 4. Review comment prefixes
+
+| Prefix | Meaning | Must fix? |
+|--------|---------|-----------|
+| `[BLOCKER]` | Merge blocker | Yes |
+| `[IMPORTANT]` | Strong suggestion | Discuss |
+| `[SUGGESTION]` | Deferrable | No |
+| `[QUESTION]` | Needs answer | Answer |
+| `[NITPICK]` | Style | Optional |
+| `[PRAISE]` | Positive | No |
+
+## 5. PR merge checklist
+
+- [ ] Tech Lead approved
+- [ ] CI green (lint, tests, SAST, build)
+- [ ] `[BLOCKER]` and `[IMPORTANT]` resolved
+- [ ] No conflicts; PR description (What / Why / How / Testing)
+- [ ] `gitnexus pr describe --auto` (or equivalent) when using GitNexus
+
+## 6. Re-review after rejection
+
+Review changed sections only; attach “Changes made”; same reviewer preferred; SLA 12h.

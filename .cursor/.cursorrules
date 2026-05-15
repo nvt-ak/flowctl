@@ -1,0 +1,48 @@
+# flowctl — Cursor Global Rules Bootstrap
+# Version: 4.0.0 | Updated: 2026-05-13
+
+## First: Read CLAUDE.md
+Before ANY action, read `CLAUDE.md` at the repo root.
+It contains the authoritative quick-start, MCP config, and workflow guide.
+
+## Agent Activation
+Check `flowctl status` to see current step.
+Load the agent matching that step: `.cursor/agents/<role>-agent.md`
+Mapping: `.cursor/INDEX.md`
+
+## Tool Priority (token-efficient order)
+1. `wf_step_context()` — all workflow context in 1 call (~300 tokens)
+2. `wf_state()` — step/status only
+3. `cat graphify-out/GRAPH_REPORT.md` — code structure (steps 4–8 only)
+4. File reads — specific files only as needed
+5. bash — write operations only
+
+## Critical Restrictions
+- Graphify: read-only via `graphify-out/` files. NO MCP write API.
+  CLI `graphify update .` is allowed after code changes (AST-only, no API cost).
+- GitNexus: CLI only (`gitnexus commit`, `gitnexus pr`) — not an MCP server.
+- Approval gate: STOP and wait for human `flowctl approve`. NEVER self-approve.
+- NEVER commit directly to main/master.
+
+## Loading Contract
+
+| Layer | When loaded | Approx. lines |
+|-------|-------------|----------------|
+| `.cursor/.cursorrules` | Always (bootstrap) | ~35 |
+| `.cursor/rules/core-rules.mdc` | Always | ~175 |
+| `.cursor/rules/tool-constraints.mdc` | Always | ~45 |
+| `.cursor/rules/review-rules.mdc` | Always (compact PR/review invariants) | ~60 |
+| Agent file (current role) | Per task | target ≤150 (trim in later waves) |
+| `SKILL.md` (hub) | On demand per task | target ≤120 |
+| Manifest `lazy` paths (`references/*.md` per skill) | Only the topic file(s) you need | unlimited |
+| `skills/core/manifest.json` | Tools / audits only — lists `compact` + `lazy[]` per skill | ~60 lines |
+| `templates/review-checklists-per-step.md` | Only during collect / approval prep | unlimited |
+
+Do NOT open every lazy reference or monolithic deep file unless the task needs that depth—pick the smallest file that answers the question.
+
+## Full Rules (English, machine-prompt)
+- **Core** (invariants, quality gates, step execution, approvals): `.cursor/rules/core-rules.mdc`
+- **Tools** (Graphify + GitNexus scope): `.cursor/rules/tool-constraints.mdc`
+- **Review** (PR merge, comments, SLAs): `.cursor/rules/review-rules.mdc`
+
+Human-facing workflow prose may remain Vietnamese in `docs/workflow-reference.md` and related docs per repo policy.

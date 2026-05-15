@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "_comment": "Copied to workflows/policies on init if missing",
+  "defaults": {
+    "run_caps": {
+      "max_tokens_total": 1000000,
+      "max_runtime_seconds": 86400,
+      "max_cost_usd": 1000.0
+    },
+    "role_caps": {
+      "max_tokens_per_role": 200000,
+      "max_runtime_per_role_seconds": 7200,
+      "max_cost_per_role_usd": 50.0
+    },
+    "estimate_per_launch": {
+      "tokens_est": 2500,
+      "runtime_seconds_est": 300,
+      "cost_usd_est": 0.02
+    },
+    "soft_thresholds": [0.7, 0.9],
+    "circuit_breaker": {
+      "cooldown_seconds": 300
+    }
+  },
+  "roles": {}
+}

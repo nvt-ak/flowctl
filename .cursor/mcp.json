@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "shell-proxy": {
+      "command": "/Users/nvt/.asdf/installs/nodejs/23.2.0/bin/flowctl",
+      "args": [
+        "mcp",
+        "--shell-proxy"
+      ],
+      "description": "Token-efficient shell proxy — wf_state, wf_git, wf_step_context, wf_files, wf_read, wf_env. Replaces bash reads with structured cached JSON. Use BEFORE any bash command."
+    },
+    "flowctl-state": {
+      "command": "/Users/nvt/.asdf/installs/nodejs/23.2.0/bin/flowctl",
+      "args": [
+        "mcp",
+        "--workflow-state"
+      ],
+      "description": "Workflow state tracker — flow_get_state, flow_advance_step, flow_request_approval, flow_add_blocker, flow_add_decision"
+    },
+    "gitnexus": {
+      "command": "/Users/nvt/.asdf/installs/nodejs/23.2.0/bin/npx",
+      "args": [
+        "gitnexus",
+        "mcp"
+      ],
+      "env": {
+        "GITNEXUS_AUTO_INDEX": "true"
+      },
+      "description": "Git intelligence — smart commits, branch naming, PR descriptions. Install: npm install -g gitnexus"
+    }
+  }
+}

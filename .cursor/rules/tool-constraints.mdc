@@ -1,0 +1,25 @@
+---
+description: Graphify code graph and GitNexus CLI — scope, allowed commands, and forbidden assumptions
+alwaysApply: true
+---
+
+# Tool Constraints — Graphify & GitNexus
+
+Version: 4.0.0 | Updated: 2026-05-13
+
+## Graphify (read-only code structure)
+
+- **Output:** `graphify-out/` — read `GRAPH_REPORT.md` first for clusters and top nodes. If `graphify-out/wiki/index.md` exists, use it instead of raw dumps.
+- **When:** Steps 4–8 only. If `graphify-out/graph.json` is missing or empty, skip Graphify and read source.
+- **After code changes in a session:** run `python3 -m graphify update .` (AST rebuild, no API cost).
+- **Scope:** symbols, modules, call graph, imports — **not** requirements, decisions, blockers, or workflow state (use `wf_step_context()` / flowctl state MCP).
+- **No MCP write API** — do not call nonexistent tools such as `graphify_update_node` or `graphify_snapshot`.
+- **MCP:** If a Graphify MCP server is enabled in project `mcp.json`, use only read-only graph tools documented for this repo.
+
+## GitNexus (git workflow CLI)
+
+- **Not an MCP server** — use terminal: `gitnexus commit`, `gitnexus branch`, `gitnexus pr`, `gitnexus review`, etc.
+- **When:** Steps 4–8; skip in 1–3 if no code branch work.
+- **Branches (Gitflow-style):** `main` (protected), `develop`, `feature/*`, `fix/*`, `release/*`, `hotfix/*`, `docs/*`, `infra/*`, `test/*`, `chore/*`.
+- **Commits:** Conventional `{type}({scope}): {description}` — types: `feat` `fix` `docs` `style` `refactor` `test` `chore` `perf` `ci` `deploy` `revert`; scopes e.g. `api` `ui` `db` `auth` `infra` `docs` or module name.
+- **Merge strategy (by policy):** feature/fix → develop (squash, Tech Lead); develop → release / release → main / hotfix paths per org sign-off (see `core-rules.mdc` approvals).

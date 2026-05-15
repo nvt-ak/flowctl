@@ -1,0 +1,95 @@
+{
+  "version": 2,
+  "description": "Split-skill registry: compact SKILL.md + lazy topic files. `lazy` is an ordered list of repo-relative paths — load only references you need (see each SKILL.md hub table).",
+  "skills_with_detail": [
+    {
+      "id": "code-review",
+      "compact": ".cursor/skills/core/code-review/SKILL.md",
+      "lazy": [
+        ".cursor/skills/core/code-review/references/philosophy-comments.md",
+        ".cursor/skills/core/code-review/references/checklists-backend.md",
+        ".cursor/skills/core/code-review/references/checklists-frontend-tests.md",
+        ".cursor/skills/core/code-review/references/findings-examples.md",
+        ".cursor/skills/core/code-review/references/prioritization-metrics.md"
+      ]
+    },
+    {
+      "id": "testing",
+      "compact": ".cursor/skills/core/testing/SKILL.md",
+      "lazy": [
+        ".cursor/skills/core/testing/references/strategy-unit.md",
+        ".cursor/skills/core/testing/references/integration.md",
+        ".cursor/skills/core/testing/references/e2e-playwright.md",
+        ".cursor/skills/core/testing/references/performance-a11y.md",
+        ".cursor/skills/core/testing/references/data-coverage-links.md"
+      ]
+    },
+    {
+      "id": "documentation",
+      "compact": ".cursor/skills/core/documentation/SKILL.md",
+      "lazy": [
+        ".cursor/skills/core/documentation/references/code-openapi.md",
+        ".cursor/skills/core/documentation/references/adr-changelog.md",
+        ".cursor/skills/core/documentation/references/readme-tracking.md"
+      ]
+    },
+    {
+      "id": "gitnexus-integration",
+      "compact": ".cursor/skills/core/gitnexus-integration/SKILL.md",
+      "lazy": [
+        ".cursor/skills/core/gitnexus-integration/references/intro-cli.md",
+        ".cursor/skills/core/gitnexus-integration/references/workflow-by-step.md",
+        ".cursor/skills/core/gitnexus-integration/references/review-hooks-health.md"
+      ]
+    },
+    {
+      "id": "graphify-integration",
+      "compact": ".cursor/skills/core/graphify-integration/SKILL.md",
+      "lazy": [
+        ".cursor/skills/core/graphify-integration/references/basics-workflow.md",
+        ".cursor/skills/core/graphify-integration/references/patterns-rebuild.md"
+      ]
+    },
+    {
+      "id": "architecture-decision",
+      "compact": ".cursor/skills/core/architecture-decision/SKILL.md",
+      "lazy": [
+        ".cursor/skills/core/architecture-decision/references/adr-template.md",
+        ".cursor/skills/core/architecture-decision/references/rubric-policy.md"
+      ]
+    },
+    {
+      "id": "requirement-analysis",
+      "compact": ".cursor/skills/core/requirement-analysis/SKILL.md",
+      "lazy": [
+        ".cursor/skills/core/requirement-analysis/references/interview-stories-moscow.md",
+        ".cursor/skills/core/requirement-analysis/references/prd-gates-handoff.md"
+      ]
+    },
+    {
+      "id": "debugging",
+      "compact": ".cursor/skills/core/debugging/SKILL.md",
+      "lazy": [
+        ".cursor/skills/core/debugging/references/evidence-hypothesis.md",
+        ".cursor/skills/core/debugging/references/layers-report-escalation.md"
+      ]
+    },
+    {
+      "id": "ux-research",
+      "compact": ".cursor/skills/core/ux-research/SKILL.md",
+      "lazy": [
+        ".cursor/skills/core/ux-research/references/methods-personas-flows.md",
+        ".cursor/skills/core/ux-research/references/checklist-usability-synthesis.md"
+      ]
+    },
+    {
+      "id": "security-review",
+      "compact": ".cursor/skills/core/security-review/SKILL.md",
+      "lazy": [
+        ".cursor/skills/core/security-review/references/owasp-prompts.md",
+        ".cursor/skills/core/security-review/references/auth-input-output.md",
+        ".cursor/skills/core/security-review/references/report-tools-escalation.md"
+      ]
+    }
+  ]
+}
