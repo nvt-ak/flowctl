@@ -1479,8 +1479,9 @@ shift || true
 
 # Ensure home dirs exist for any command that writes runtime state
 # (skip for init — cmd_init() creates dirs itself after generating flow_id)
+# (skip for fork — fork only writes to $REPO_ROOT/.flowctl/, never to FLOWCTL_HOME)
 case "$CMD" in
-  -v|--version|version|init|monitor|mon|mcp|help|-h|--help) ;;
+  -v|--version|version|init|monitor|mon|mcp|help|-h|--help|fork) ;;
   *)
     flowctl_ensure_data_dirs
     ;;
