@@ -16,9 +16,9 @@ import { runReject } from "@/commands/reject";
 import { runSkip, runUnskip } from "@/commands/skip";
 import { runStart } from "@/commands/start";
 import { runStatus } from "@/commands/status";
-import { runDispatch } from "@/commands/dispatch/index";
-import { runCursorDispatch } from "@/commands/cursor-dispatch/index";
-import { runFlow } from "@/commands/flow/index";
+import { runDispatch } from "@/commands/dispatch";
+import { runCursorDispatch } from "@/commands/cursor-dispatch";
+import { runFlow } from "@/commands/flow";
 import { runFork } from "@/commands/fork";
 import { runCollect } from "@/commands/collect";
 import { runPlan } from "@/commands/plan";
@@ -29,12 +29,13 @@ import { runSummary } from "@/commands/summary";
 import { runHistory } from "@/commands/history";
 import { runReleaseDashboard } from "@/commands/release-dashboard";
 import { runInit } from "@/commands/init";
+import { runMcp, type McpCliOptions } from "@/commands/mcp";
 import { runComplexity } from "@/commands/complexity";
 import { runBudgetStatus } from "@/commands/budget";
-import { runWarRoom } from "@/commands/war-room/index";
+import { runWarRoom } from "@/commands/war-room";
 import { runWarRoomMerge } from "@/commands/war-room/merge";
-import { runMercenary } from "@/commands/mercenary/index";
-import { runTeam, type TeamRecoverOptions } from "@/commands/team/index";
+import { runMercenary } from "@/commands/mercenary";
+import { runTeam, type TeamRecoverOptions } from "@/commands/team";
 import { acquireFlowLock } from "@/utils/lock";
 
 const pkg = JSON.parse(
@@ -163,10 +164,8 @@ program
   .option("--steps <list>", "Steps to skip (comma or space separated)")
   .option("-s, --step <n>", "Alias for single step")
   .option("-p, --preset <name>", "Skip preset")
-  .option("--type <t>", "Reason type")
-  .option("-t, --type <t>", "Reason type (alias)")
-  .option("--reason <text>", "Skip reason")
-  .option("-r, --reason <text>", "Skip reason (alias)")
+  .option("-t, --type <t>", "Reason type")
+  .option("-r, --reason <text>", "Skip reason")
   .option("--by <name>", "Who skipped", "PM")
   .action(async (opts: Record<string, string | undefined>) => {
     await runCommand("skip", (ctx) =>
@@ -182,10 +181,9 @@ program
 
 program
   .command("unskip")
-  .description("Đảo skip — đặt step về pending")
+  .description("Reverse skip — set step to pending")
   .requiredOption("-s, --step <n>", "Step number (1–9)")
-  .option("--reason <text>", "Lý do unskip")
-  .option("-r, --reason <text>", "Lý do (alias)")
+  .option("-r, --reason <text>", "Reason for unskip")
   .action(async (opts: Record<string, string | undefined>) => {
     await runCommand("unskip", (ctx) =>
       runUnskip(ctx, {
@@ -197,18 +195,18 @@ program
 
 program
   .command("assess")
-  .description("Đánh giá steps để quyết định skip")
+  .description("Assess steps to decide skip")
   .action(async () => {
     await runCommand("assess", runAssess);
   });
 
 const blockerCmd = program
   .command("blocker")
-  .description("Quản lý blockers");
+  .description("Manage blockers");
 
 blockerCmd
   .command("add <description>")
-  .description("Thêm blocker")
+  .description("Add blocker")
   .action(async (description: string) => {
     await runCommand("blocker", (ctx) => runBlockerAdd(ctx, description));
   });
@@ -222,14 +220,14 @@ blockerCmd
 
 blockerCmd
   .command("reconcile")
-  .description("Auto-resolve blockers khi điều kiện đã thỏa")
+  .description("Auto-resolve blockers when conditions are met")
   .action(async () => {
     await runCommand("blocker", (ctx) => runBlockerReconcile(ctx));
   });
 
 program
   .command("decision <description>")
-  .description("Ghi nhận quyết định")
+  .description("Record decision")
   .alias("d")
   .action(async (description: string) => {
     await runCommand("decision", (ctx) => runDecision(ctx, description));
@@ -612,8 +610,25 @@ program
   });
 
 program
+  .command("mcp")
+  .description("MCP servers — stdio (--shell-proxy | --workflow-state) hoặc --setup")
+  .option("--shell-proxy", "Shell proxy MCP (stdio)")
+  .option("--workflow-state", "Workflow state MCP (stdio)")
+  .option("--setup", "In hướng dẫn snippet .cursor/mcp.json")
+  .action(async (opts: McpCliOptions) => {
+    try {
+      const ctx = await getContext();
+      await runMcp(ctx, opts);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(message);
+      process.exitCode = 1;
+    }
+  });
+
+program
   .command("init")
-  .description("Khởi tạo project (partial TS — MCP merge Phase 4 nếu FLOWCTL_ENGINE=ts)")
+  .description("Khởi tạo project (MCP merge: TS khi FLOWCTL_ENGINE=ts, Python mặc định)")
   .option("--project <name>", "Tên dự án")
   .option("--overwrite", "Ghi đè scaffold / reset active flow state")
   .option("--no-setup", "Bỏ qua setup.sh")

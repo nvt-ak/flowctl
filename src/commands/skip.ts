@@ -3,7 +3,7 @@ import type { FlowctlContext } from "@/cli/context";
 import { requireStateFile } from "@/cli/context";
 import { invalidateWarRoomDigest } from "@/commands/war-room/digest";
 import { readState } from "@/state/reader";
-import { FlowctlStateSchema } from "@/state/schema";
+import { FlowctlStateSchema, type Step } from "@/state/schema";
 import { setPath } from "@/state/writer";
 import { atomicJsonWrite } from "@/utils/json";
 import { nowTimestamp } from "@/utils/time";
@@ -71,19 +71,20 @@ export async function runUnskip(
       if (pullCurrent) {
         nextCurrent = n;
       }
+      const unskipped: Step = {
+        ...stepObj,
+        status: "pending",
+        skip_reason: "",
+        skip_type: "",
+        skipped_by: "",
+        skipped_at: "",
+      };
       return {
         ...current,
         current_step: nextCurrent,
         steps: {
           ...current.steps,
-          [key]: {
-            ...stepObj,
-            status: "pending",
-            skip_reason: "",
-            skip_type: "",
-            skipped_by: "",
-            skipped_at: "",
-          },
+          [key]: unskipped,
         },
         updated_at: nowTimestamp(),
       };

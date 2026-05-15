@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "flow_id": "wf-fixture-00000000-0000-0000-000000000002",
+  "project_name": "Fixture — skipped step 3",
+  "project_description": "",
+  "created_at": "2026-01-01 00:00:00",
+  "updated_at": "2026-01-02 10:00:00",
+  "current_step": 5,
+  "overall_status": "in_progress",
+  "steps": {
+    "3": {
+      "name": "UI/UX Design",
+      "agent": "ui-ux",
+      "support_agents": ["frontend", "pm"],
+      "status": "skipped",
+      "started_at": null,
+      "completed_at": null,
+      "approved_at": null,
+      "approved_by": null,
+      "approval_status": null,
+      "graphify_snapshot": null,
+      "notes": "",
+      "deliverables": [],
+      "blockers": [],
+      "decisions": [],
+      "skip_reason": "api-only preset",
+      "skip_type": "api-only",
+      "skipped_by": "PM",
+      "skipped_at": "2026-01-02 10:00:00"
+    }
+  },
+  "metrics": {
+    "total_blockers": 0,
+    "total_decisions": 0,
+    "steps_completed": 0,
+    "on_schedule": true
+  }
+}

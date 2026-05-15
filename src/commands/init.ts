@@ -23,6 +23,7 @@ import {
 import { defaultState } from "@/state/default-state";
 import { readState } from "@/state/reader";
 import { FlowctlStateSchema } from "@/state/schema";
+import { mergeCursorMcp } from "@/lib/mcp-merge";
 import { atomicJsonWrite } from "@/utils/json";
 import { pathExists } from "@/utils/fs";
 import { nowTimestamp } from "@/utils/time";
@@ -38,12 +39,33 @@ async function runScaffoldMerge(
   workflowRoot: string,
   overwrite: boolean,
 ): Promise<void> {
+  const mcpPath = join(projectRoot, ".cursor", "mcp.json");
   if (process.env.FLOWCTL_ENGINE === "ts") {
-    console.log(
-      chalk.yellow(
-        "TS engine: skipped .cursor/mcp.json merge — Phase 4 (migration-plan §Phase 3 week 4).",
-      ),
-    );
+    try {
+      const result = await mergeCursorMcp({
+        mcpPath,
+        overwrite,
+        mode: { type: "scaffold", workflowCli: "flowctl" },
+      });
+      if (result.exitCode === 2) {
+        const invalidJson = result.lines.some((l) => l.includes("MCP_STATUS=invalid_json"));
+        console.warn(
+          chalk.yellow(
+            invalidJson
+              ? ".cursor/mcp.json: invalid JSON — fix manually or run init --overwrite"
+              : ".cursor/mcp.json: invalid structure — fix manually or run init --overwrite",
+          ),
+        );
+      }
+    } catch (e: unknown) {
+      const code = (e as NodeJS.ErrnoException)?.code;
+      const msg = e instanceof Error ? e.message : String(e);
+      if (code === "EACCES" || msg.includes("permission denied")) {
+        console.warn(chalk.yellow(".cursor/mcp.json: permission denied — skipped merge"));
+      } else {
+        console.warn(chalk.yellow(`merge MCP: ${msg}`));
+      }
+    }
     return;
   }
   const script = join(workflowRoot, "scripts", "merge_cursor_mcp.py");
@@ -51,7 +73,6 @@ async function runScaffoldMerge(
     console.warn(chalk.yellow(`merge script missing: ${script}`));
     return;
   }
-  const mcpPath = join(projectRoot, ".cursor", "mcp.json");
   const pyArgs = overwrite
     ? [script, "--overwrite", "--scaffold", "flowctl", mcpPath]
     : [script, "--scaffold", "flowctl", mcpPath];
@@ -120,7 +141,7 @@ async function ensureGateTemplates(
   }
 }
 
-/** Copy scaffold assets (partial Phase 3 — MCP merge delegates to Python unless FLOWCTL_ENGINE=ts). */
+/** Copy scaffold assets (partial Phase 3 — MCP merge: TS `mcp-merge.ts` when FLOWCTL_ENGINE=ts, else Python). */
 export async function ensureProjectScaffold(
   projectRoot: string,
   workflowRoot: string,
@@ -348,7 +369,7 @@ async function maybeRunSetup(
 
 /**
  * Partial `flowctl init` (Phase 3 week 4): flows bootstrap, state finalize, scaffold,
- * optional setup.sh. MCP merge delegates to merge_cursor_mcp.py unless FLOWCTL_ENGINE=ts.
+ * optional setup.sh. MCP merge: `merge_cursor_mcp.py` by default; TypeScript `mergeCursorMcp` when FLOWCTL_ENGINE=ts.
  */
 export async function runInit(ctx: FlowctlContext, opts: InitOptions = {}): Promise<void> {
   const skipSetup =

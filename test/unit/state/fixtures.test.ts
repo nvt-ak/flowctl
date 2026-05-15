@@ -38,27 +38,19 @@ describe("state JSON fixtures", () => {
     );
   });
 
-  it("parses any *.json under tests/ that look like workflow state", () => {
-    const testsDir = join(repoRoot, "tests");
-    const candidates: string[] = [];
-    const walk = (dir: string) => {
-      for (const name of readdirSync(dir, { withFileTypes: true })) {
-        const p = join(dir, name.name);
-        if (name.isDirectory()) walk(p);
-        else if (name.name.endsWith(".json") && name.name.includes("state")) {
-          candidates.push(p);
-        }
-      }
-    };
-    try {
-      walk(testsDir);
-    } catch {
-      /* tests dir only */
-    }
-    for (const file of candidates) {
-      const raw = JSON.parse(readFileSync(file, "utf-8"));
+  it("parses all committed JSON under tests/fixtures/flowctl-state/", () => {
+    const dir = join(repoRoot, "tests/fixtures/flowctl-state");
+    const names = readdirSync(dir).filter((n) => n.endsWith(".json"));
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names) {
+      const raw = JSON.parse(
+        readFileSync(join(dir, name), "utf-8"),
+      ) as unknown;
       const result = FlowctlStateSchema.safeParse(normalizeRaw(raw));
-      expect(result.success, `fixture ${file}`).toBe(true);
+      expect(
+        result.success,
+        result.success ? name : `${name}: ${result.error.message}`,
+      ).toBe(true);
     }
   });
 });

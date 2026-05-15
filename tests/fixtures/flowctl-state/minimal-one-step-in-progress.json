@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "flow_id": "wf-fixture-00000000-0000-0000-000000000001",
+  "project_name": "Fixture — minimal one step",
+  "project_description": "",
+  "created_at": "2026-01-01 00:00:00",
+  "updated_at": "2026-01-01 00:00:00",
+  "current_step": 1,
+  "overall_status": "in_progress",
+  "steps": {
+    "1": {
+      "name": "Requirements",
+      "agent": "pm",
+      "support_agents": ["tech-lead"],
+      "status": "in_progress",
+      "started_at": "2026-01-01 00:00:00",
+      "completed_at": null,
+      "approved_at": null,
+      "approved_by": null,
+      "approval_status": null,
+      "graphify_snapshot": null,
+      "notes": "",
+      "deliverables": [],
+      "blockers": [],
+      "decisions": []
+    }
+  },
+  "metrics": {
+    "total_blockers": 0,
+    "total_decisions": 0,
+    "steps_completed": 0,
+    "on_schedule": true
+  }
+}
