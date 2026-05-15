@@ -73,6 +73,36 @@ async function reclaimStaleDirLock(lockDir: string): Promise<boolean> {
   return tryAcquireDirLock(lockDir);
 }
 
+/** Lock using `lockDir` as the directory path (bash `flows.new.lock` parity). */
+export async function withNamedDirLock<T>(
+  lockDir: string,
+  fn: () => Promise<T>,
+  opts: LockOpts = {},
+): Promise<T> {
+  const maxRetries = opts.maxRetries ?? 40;
+  const baseDelayMs = opts.baseDelayMs ?? 25;
+  let result!: T;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    if (
+      (await tryAcquireDirLock(lockDir)) ||
+      (await reclaimStaleDirLock(lockDir))
+    ) {
+      try {
+        result = await fn();
+      } finally {
+        await rm(lockDir, { recursive: true, force: true });
+      }
+      return result;
+    }
+    await sleep(baseDelayMs * 0.1 + Math.random() * 9);
+  }
+
+  throw new Error(
+    `Could not acquire dir lock after ${maxRetries} attempts: ${lockDir}`,
+  );
+}
+
 /** Serialize critical sections (state / idempotency) via mkdir lock dir. */
 export async function withAdvisoryLock(
   lockPath: string,

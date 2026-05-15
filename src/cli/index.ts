@@ -12,6 +12,10 @@ import { runReject } from "@/commands/reject";
 import { runSkip } from "@/commands/skip";
 import { runStart } from "@/commands/start";
 import { runStatus } from "@/commands/status";
+import { runDispatch } from "@/commands/dispatch/index";
+import { runCursorDispatch } from "@/commands/cursor-dispatch/index";
+import { runFlow } from "@/commands/flow/index";
+import { runFork } from "@/commands/fork";
 import { acquireFlowLock } from "@/utils/lock";
 
 const pkg = JSON.parse(
@@ -201,6 +205,100 @@ program
     await runCommand("conditional", (ctx) =>
       runReject(ctx, items ?? "Conditional approval — items pending"),
     );
+  });
+
+program
+  .command("dispatch")
+  .description("Dispatch workers for current step")
+  .option("--launch", "Auto-launch workers")
+  .option("--headless", "Headless worker mode")
+  .option("--trust", "Request workspace trust")
+  .option("--dry-run", "Generate briefs only")
+  .option("--force-run", "Bypass idempotency skip")
+  .option("--max-retries <n>", "Max retries per role", "3")
+  .option("--role <name>", "Dispatch single role")
+  .action(async (opts: Record<string, string | boolean | undefined>) => {
+    await runCommand("dispatch", (ctx) =>
+      runDispatch(ctx, {
+        launch: opts.launch === true,
+        headless: opts.headless === true,
+        trust: opts.trust === true,
+        dryRun: opts.dryRun === true,
+        forceRun: opts.forceRun === true,
+        maxRetries: typeof opts.maxRetries === "string" ? opts.maxRetries : "3",
+        role: typeof opts.role === "string" ? opts.role : undefined,
+      }),
+    );
+  });
+
+program
+  .command("cursor-dispatch")
+  .alias("cd")
+  .description("Cursor-native parallel dispatch (War Room gate + spawn board)")
+  .option("--skip-war-room", "Skip War Room phase")
+  .option("--merge", "Merge War Room outputs (bash war-room)")
+  .option("--high-risk", "Flag high risk on step")
+  .option("--impacted-modules <n>", "Impacted module count", (v) => Number(v))
+  .option("--force-war-room", "Always run War Room")
+  .action(async (opts: Record<string, string | boolean | number | undefined>) => {
+    await runCommand("cursor-dispatch", (ctx) =>
+      runCursorDispatch(ctx, {
+        skipWarRoom: opts.skipWarRoom === true,
+        merge: opts.merge === true,
+        highRisk: opts.highRisk === true,
+        impactedModules:
+          typeof opts.impactedModules === "number"
+            ? opts.impactedModules
+            : undefined,
+        forceWarRoom: opts.forceWarRoom === true,
+      }),
+    );
+  });
+
+const flowCmd = program.command("flow").alias("flows").description("Multi-flow registry");
+
+flowCmd
+  .command("list")
+  .alias("ls")
+  .description("List flows in .flowctl/flows.json")
+  .action(async () => {
+    const ctx = await getContext();
+    await runFlow(ctx, "list", []);
+  });
+
+flowCmd
+  .command("new")
+  .description("Create a new flow and set active")
+  .option("--label <text>", "Flow label")
+  .option("--project <name>", "Project name")
+  .action(async (opts: { label?: string; project?: string }) => {
+    const ctx = await getContext();
+    await runFlow(ctx, "new", [], { label: opts.label, project: opts.project });
+  });
+
+flowCmd
+  .command("switch <flowId>")
+  .alias("sw")
+  .description("Switch active flow in flows.json")
+  .action(async (flowId: string) => {
+    const ctx = await getContext();
+    await runFlow(ctx, "switch", [flowId]);
+  });
+
+program
+  .command("fork")
+  .description("Fork isolated flow (eval \"$(flowctl fork)\")")
+  .option("-l, --label <text>", "Fork label")
+  .option("--project <name>", "Project name")
+  .action(async (opts: { label?: string; project?: string }) => {
+    try {
+      const ctx = await getContext();
+      await runFork(ctx, { label: opts.label, project: opts.project });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(message);
+      process.exitCode = 1;
+    }
   });
 
 await program.parseAsync(process.argv);
