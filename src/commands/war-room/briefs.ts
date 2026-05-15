@@ -14,20 +14,20 @@ async function priorDecisionsText(state: FlowctlState, step: number): Promise<st
       }
     }
   }
-  return lines.slice(-10).join("\n") || "- Chưa có decisions từ các steps trước";
+  return lines.slice(-10).join("\n") || "- No decisions from previous steps";
 }
 
 async function lessonsText(retroDir: string): Promise<string> {
   const lessonsFile = join(retroDir, "lessons.json");
-  if (!(await pathExists(lessonsFile))) return "- Chưa có retro data";
+  if (!(await pathExists(lessonsFile))) return "- No retro data";
   try {
     const d = JSON.parse(await readFile(lessonsFile, "utf-8")) as {
       patterns?: string[];
     };
     const items = (d.patterns ?? []).slice(-5);
-    return items.map((i) => `- ${i}`).join("\n") || "- Chưa có retro data";
+    return items.map((i) => `- ${i}`).join("\n") || "- No retro data";
   } catch {
-    return "- Chưa có retro data";
+    return "- No retro data";
   }
 }
 
@@ -54,10 +54,10 @@ export async function generateWarRoomBriefs(opts: {
   const lessons = await lessonsText(opts.retroDir);
   const wrRel = relative(opts.repoRoot, opts.wrDir);
 
-  const pmBrief = `# War Room Brief — @pm — Phân tích scope Step ${opts.step}: ${opts.stepName}
+  const pmBrief = `# War Room Brief — @pm — Analyze scope Step ${opts.step}: ${opts.stepName}
 
-## Nhiệm vụ
-Bạn là PM Agent. War Room phase — phân tích scope TRƯỚC khi dispatch team.
+## Task
+You are PM Agent. War Room phase — analyze scope BEFORE dispatching team.
 
 ## Context (compile-once)
 Read **\`@${snapRel}\`** — Context Snapshot. Skip \`wf_step_context()\` when **FRESH**.
@@ -69,13 +69,13 @@ ${prior}
 ${lessons}
 
 ## Output
-Ghi vào: ${wrRel}/pm-analysis.md
+Write to: ${wrRel}/pm-analysis.md
 `;
 
   const tlBrief = `# War Room Brief — @tech-lead — Technical Assessment Step ${opts.step}: ${opts.stepName}
 
-## Nhiệm vụ
-Bạn là Tech Lead. War Room phase — đánh giá feasibility TRƯỚC khi dispatch team.
+## Task
+You are Tech Lead. War Room phase — assess feasibility BEFORE dispatching team.
 
 ## Context
 Read **\`@${snapRel}\`**
@@ -84,7 +84,7 @@ Read **\`@${snapRel}\`**
 ${prior}
 
 ## Output
-Ghi vào: ${wrRel}/tech-lead-assessment.md
+Write to: ${wrRel}/tech-lead-assessment.md
 `;
 
   await writeFile(join(opts.wrDir, "pm-analysis-brief.md"), pmBrief, "utf-8");

@@ -183,9 +183,9 @@ export function collectFromReports(opts: {
         let stepPart: string;
         let reason: string;
         if (body.includes("|")) {
-          [stepPart, reason] = body.split("|", 2);
+          [stepPart, reason] = body.split("|", 2) as [string, string];
         } else if (body.includes("—")) {
-          [stepPart, reason] = body.split("—", 2);
+          [stepPart, reason] = body.split("—", 2) as [string, string];
         } else {
           stepPart = body;
           reason = "";

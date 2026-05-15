@@ -32,7 +32,7 @@ export async function runApprove(
     );
     if (!gate.ok) {
       await writeGateReport(ctx.paths, step, "FAIL", gate.detail, by);
-      console.error(chalk.red.bold("\nAPPROVE bị chặn bởi QA Gate."));
+      console.error(chalk.red.bold("\nAPPROVE blocked by QA Gate."));
       console.error(chalk.red(gate.detail));
       console.error(
         chalk.cyan(`Bypass: flowctl approve --skip-gate --by "${by}"\n`),
@@ -81,13 +81,13 @@ export async function runApprove(
     await setPath(stateFile, "current_step", nextActive);
     const nextName = getStepName(fresh.data, nextActive);
     const nextAgent = getStepAgent(fresh.data, nextActive);
-    console.log(chalk.cyan.bold(`\n→ Tiếp theo: Step ${nextActive} — ${nextName}`));
+    console.log(chalk.cyan.bold(`\nNext: Step ${nextActive} — ${nextName}`));
     console.log(`Agent: ${chalk.yellow(`@${nextAgent}`)}`);
-    console.log(chalk.bold("\nBắt đầu: flowctl start\n"));
+    console.log(chalk.bold("\nStart: flowctl start\n"));
   } else {
     await setPath(stateFile, "overall_status", "completed");
     console.log(
-      chalk.green.bold("\n🎉 WORKFLOW HOÀN THÀNH! Project đã release.\n"),
+      chalk.green.bold("\n🎉 WORKFLOW COMPLETED! Project released.\n"),
     );
   }
 }

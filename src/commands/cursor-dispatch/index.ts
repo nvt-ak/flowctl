@@ -34,7 +34,7 @@ export async function runCursorDispatch(
   if (opts.merge) {
     console.log(
       chalk.cyan(
-        "→ War Room merge: chạy `flowctl war-room merge` (bash) rồi `flowctl cursor-dispatch` lại.\n",
+        "→ War Room merge: run `flowctl war-room merge` (bash) then `flowctl cursor-dispatch` again.\n",
       ),
     );
     return;
@@ -61,7 +61,7 @@ export async function runCursorDispatch(
       await bumpDispatchCount(stateFile, step);
       console.log(
         chalk.yellow(
-          "War Room body chưa port TS — chạy: flowctl war-room (bash) hoặc --skip-war-room",
+          "War Room body not ported to TS — run: flowctl war-room (bash) or --skip-war-room",
         ),
       );
       return;

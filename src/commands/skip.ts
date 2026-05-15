@@ -1,8 +1,11 @@
 import chalk from "chalk";
 import type { FlowctlContext } from "@/cli/context";
 import { requireStateFile } from "@/cli/context";
+import { invalidateWarRoomDigest } from "@/commands/war-room/digest";
 import { readState } from "@/state/reader";
+import { FlowctlStateSchema } from "@/state/schema";
 import { setPath } from "@/state/writer";
+import { atomicJsonWrite } from "@/utils/json";
 import { nowTimestamp } from "@/utils/time";
 import {
   skipPresetSteps,
@@ -23,6 +26,86 @@ function parseStepsList(stepsArg: string): number[] {
     .split(/[,\s]+/)
     .map((s) => Number(s.trim()))
     .filter((n) => Number.isInteger(n) && n >= 1 && n <= 9);
+}
+
+export type UnskipOptions = {
+  step?: string;
+  reason?: string;
+};
+
+/** Reverse skip for one step — mirrors `cmd_unskip` in scripts/flowctl.sh. */
+export async function runUnskip(
+  ctx: FlowctlContext,
+  opts: UnskipOptions,
+): Promise<void> {
+  const stepArg = (opts.step ?? "").trim();
+  if (!stepArg) {
+    throw new Error("Cần chỉ định --step N.");
+  }
+  const n = Number(stepArg);
+  if (!Number.isInteger(n) || n < 1 || n > 9) {
+    throw new Error(`Step không hợp lệ: ${stepArg}`);
+  }
+  const stateFile = requireStateFile(ctx);
+  const read = await readState(stateFile);
+  if (!read.ok) throw new Error(read.error);
+
+  const curStatus = getStep(read.data, n)?.status ?? "pending";
+  if (curStatus !== "skipped") {
+    throw new Error(
+      `Step ${stepArg} không ở trạng thái skipped (hiện: ${curStatus}).`,
+    );
+  }
+
+  const stepName = getStepName(read.data, n);
+  const currentStep = Number(read.data.current_step);
+  const pullCurrent = n < currentStep;
+
+  await atomicJsonWrite(
+    stateFile,
+    (current) => {
+      const key = String(n);
+      const stepObj = current.steps[key];
+      if (!stepObj) throw new Error(`Step ${n} không tồn tại trong state.`);
+      let nextCurrent = current.current_step;
+      if (pullCurrent) {
+        nextCurrent = n;
+      }
+      return {
+        ...current,
+        current_step: nextCurrent,
+        steps: {
+          ...current.steps,
+          [key]: {
+            ...stepObj,
+            status: "pending",
+            skip_reason: "",
+            skip_type: "",
+            skipped_by: "",
+            skipped_at: "",
+          },
+        },
+        updated_at: nowTimestamp(),
+      };
+    },
+    FlowctlStateSchema,
+  );
+
+  await invalidateWarRoomDigest(ctx.paths.dispatchBase, stepArg);
+
+  if (pullCurrent) {
+    console.log(
+      chalk.yellow(`current_step đã được đặt lại về step ${stepArg}.`),
+    );
+  }
+
+  console.log(
+    chalk.green(`\n✓ Step ${stepArg} — ${stepName}: UNSKIPPED (pending)`),
+  );
+  if (opts.reason?.trim()) {
+    console.log(`  Lý do unskip: ${opts.reason.trim()}`);
+  }
+  console.log("");
 }
 
 export async function runSkip(ctx: FlowctlContext, opts: SkipOptions): Promise<void> {

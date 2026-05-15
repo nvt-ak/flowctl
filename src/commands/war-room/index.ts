@@ -71,7 +71,7 @@ export async function runWarRoom(ctx: FlowctlContext): Promise<void> {
     console.log(chalk.cyan(`  Context digest: ${rel}`));
     console.log(
       chalk.bold(
-        "  Tiếp tục: flowctl cursor-dispatch --skip-war-room hoặc flowctl cursor-dispatch --merge\n",
+        "  Continue: flowctl cursor-dispatch --skip-war-room or flowctl cursor-dispatch --merge\n",
       ),
     );
     return;
@@ -87,7 +87,7 @@ export async function runWarRoom(ctx: FlowctlContext): Promise<void> {
   );
   console.log(
     chalk.magenta.bold(
-      `║  Complexity: ${score}/5 — PM + TechLead align trước khi dispatch`,
+      `║  Complexity: ${score}/5 — PM + TechLead align BEFORE dispatching team`,
     ),
   );
   console.log(
@@ -103,10 +103,10 @@ export async function runWarRoom(ctx: FlowctlContext): Promise<void> {
     dispatchBase: ctx.paths.dispatchBase,
     retroDir: ctx.paths.retroDir,
   });
-  console.log(chalk.green(`✓ War Room briefs tại ${wrDir.replace(ctx.projectRoot + "/", "")}/`));
+  console.log(chalk.green(`✓ War Room briefs at ${wrDir.replace(ctx.projectRoot + "/", "")}/`));
 
   printWarRoomSpawnBoard(wrDir, ctx.projectRoot);
 
-  console.log(chalk.yellow.bold("⏸  Sau khi PM + TechLead hoàn thành War Room:"));
-  console.log(chalk.bold("  Chạy: flowctl war-room merge\n"));
+  console.log(chalk.yellow.bold("⏸  After PM + TechLead finish War Room:"));
+  console.log(chalk.bold("  Run: flowctl war-room merge\n"));
 }

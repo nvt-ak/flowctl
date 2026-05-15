@@ -30,7 +30,7 @@ function buildRetroPayload(
   stepName: string,
 ): RetroPayload {
   const stepKey = String(step);
-  const stepObj = state.steps[stepKey] ?? {};
+  const stepObj = state.steps[stepKey] ?? { blockers: [], decisions: [] };
   const blockerCounts: Record<string, number> = {};
   const blockersByType: string[] = [];
 

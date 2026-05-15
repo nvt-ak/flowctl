@@ -19,8 +19,8 @@ export async function runWarRoomMerge(ctx: FlowctlContext): Promise<void> {
   const pmOut = join(wrDir, "pm-analysis.md");
   const tlOut = join(wrDir, "tech-lead-assessment.md");
   if (!(await pathExists(pmOut)) && !(await pathExists(tlOut))) {
-    console.log(chalk.red("[war-room merge] Chưa có output từ PM hoặc TechLead."));
-    console.log(`  Cần: ${pmOut.replace(ctx.projectRoot + "/", "")}`);
+    console.log(chalk.red("[war-room merge] No output from PM or TechLead."));
+    console.log(`  Need: ${pmOut.replace(ctx.projectRoot + "/", "")}`);
     throw new Error("War room outputs missing");
   }
 
@@ -36,6 +36,6 @@ export async function runWarRoomMerge(ctx: FlowctlContext): Promise<void> {
   });
 
   console.log(
-    chalk.green("✓ Context digest đã tạo — sẵn sàng chạy cursor-dispatch\n"),
+    chalk.green("✓ Context digest created — ready to run cursor-dispatch\n"),
   );
 }

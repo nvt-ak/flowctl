@@ -315,7 +315,7 @@ async function maybeRunSetup(
     if (runSetup && !isNewProject) {
       console.log(
         chalk.cyan(
-          "Project đã tồn tại — bỏ qua setup (dùng --overwrite để chạy lại setup).",
+          "Project exists — skip setup (use --overwrite to run setup again).",
         ),
       );
     }
@@ -323,10 +323,10 @@ async function maybeRunSetup(
   }
   const setupScript = join(workflowRoot, "scripts", "setup.sh");
   if (!(await pathExists(setupScript))) {
-    console.warn(chalk.yellow(`Không tìm thấy setup: ${setupScript} (bỏ qua)`));
+    console.warn(chalk.yellow(`setup not found: ${setupScript} (skip)`));
     return;
   }
-  console.log(chalk.cyan("Chạy setup (Graphify, MCP, .gitignore)..."));
+  console.log(chalk.cyan("Run setup (Graphify, MCP, .gitignore)..."));
   const code = await new Promise<number>((res, rej) => {
     const env = { ...process.env, FLOWCTL_PROJECT_ROOT: projectRoot };
     const sh = spawn("bash", [setupScript], {
@@ -337,11 +337,11 @@ async function maybeRunSetup(
     sh.on("error", rej);
     sh.on("close", (c) => res(c ?? 1));
   });
-  if (code === 0) console.log(chalk.green("Setup hoàn tất."));
+  if (code === 0) console.log(chalk.green("Setup completed."));
   else
     console.warn(
       chalk.yellow(
-        `setup.sh thoát ${code} — chạy lại: FLOWCTL_PROJECT_ROOT="${projectRoot}" bash "${setupScript}"`,
+        `setup.sh exited ${code} — run again: FLOWCTL_PROJECT_ROOT="${projectRoot}" bash "${setupScript}"`,
       ),
     );
 }
@@ -402,20 +402,20 @@ export async function runInit(ctx: FlowctlContext, opts: InitOptions = {}): Prom
   await maybeRunSetup(ctx.workflowRoot, ctx.projectRoot, isNewProject, runSetup);
 
   console.log("");
-  console.log(chalk.green(`Project "${projectName}" đã được khởi tạo.`));
-  console.log(chalk.cyan("Step hiện tại: 1 — Requirements Analysis"));
-  console.log(chalk.cyan("Agent cần dùng: @pm (hỗ trợ: @tech-lead)"));
-  console.log(chalk.cyan("Bước tiếp theo: flowctl start"));
+  console.log(chalk.green(`Project "${projectName}" initialized.`));
+  console.log(chalk.cyan("Current step: 1 — Requirements Analysis"));
+  console.log(chalk.cyan("Agent needed: @pm (support: @tech-lead)"));
+  console.log(chalk.cyan("Next step: flowctl start"));
   if (overwrite) {
     console.log(
       chalk.yellow(
-        `Ghi đè scaffold chỉ khi thật sự cần: flowctl init --overwrite --project "${projectName}"`,
+        `Overwrite scaffold only when really needed: flowctl init --overwrite --project "${projectName}"`,
       ),
     );
   }
   if (skipSetup) {
     console.log(
-      chalk.cyan("Đã bỏ qua setup (dùng --no-setup hoặc FLOWCTL_SKIP_SETUP=1)."),
+      chalk.cyan("Skipped setup (use --no-setup or FLOWCTL_SKIP_SETUP=1)."),
     );
   }
   console.log("");

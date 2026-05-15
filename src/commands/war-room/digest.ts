@@ -82,25 +82,25 @@ Generated: ${generated} | Mode: ${mode}
 
 ${snap}
 
-### Khi cần live hơn snapshot
+### When live data is needed
 \`\`\`
 wf_step_context()    ← state + decisions + blockers (~300 tokens)
 wf_state()           ← step/status only
 \`\`\`
-> Graphify / query_graph chỉ cho code structure (steps 4–8).
+> Graphify / query_graph only for code structure (steps 4–8).
 
 ---
 
 ## 📋 Prior Decisions (last 10)
-${priorDecisions.slice(-10).join("\n") || "- Chưa có decisions từ các steps trước"}
+${priorDecisions.slice(-10).join("\n") || "- No decisions from previous steps"}
 
 ## 🚧 Open Blockers
-${openBlockers.join("\n") || "- Không có blockers mở"}
+${openBlockers.join("\n") || "- No open blockers"}
 
 `;
 
   if (pmAnalysis) {
-    digest += `## 🎯 PM Analysis (War Room Output)
+    digest += `## 🎯 PM Analysis (War Room output)
 ${pmAnalysis}
 
 `;

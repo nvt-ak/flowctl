@@ -12,13 +12,13 @@ export async function runFlowSwitch(
 ): Promise<void> {
   const trimmed = target.trim();
   if (!trimmed) {
-    throw new Error("Thiếu flow id (prefix wf-... hoặc 8 ký tự hex).");
+    throw new Error("Missing flow id (prefix wf-... or 8 hex characters).");
   }
 
   const existing = await readFlowsIndex(ctx.projectRoot);
   if (!existing) {
     throw new Error(
-      "Không tìm thấy .flowctl/flows.json — chạy: flowctl flow new trước",
+      "No .flowctl/flows.json — run: flowctl flow new first",
     );
   }
 
@@ -36,7 +36,7 @@ export async function runFlowSwitch(
   console.log(chalk.green(`active_flow_id set to ${match}`));
   console.log(
     chalk.cyan(
-      "Đã switch flow. Terminal mới: export FLOWCTL_ACTIVE_FLOW= hoặc reload MCP.",
+      "Switched flow. New terminal: export FLOWCTL_ACTIVE_FLOW= or reload MCP.",
     ),
   );
 }

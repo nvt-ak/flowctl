@@ -10,17 +10,17 @@ export const SKIP_PRESETS: Record<string, number[]> = {
 };
 
 export const SKIP_REASON_LABELS: Record<string, string> = {
-  "no-ui": "Không có UI changes",
-  "no-backend": "Không có backend changes",
+  "no-ui": "No UI changes",
+  "no-backend": "No backend changes",
   hotfix: "Hotfix — bỏ qua ceremony",
-  "api-only": "API-only — không cần Frontend/UI",
-  "backend-api": "API-only — không cần Frontend/UI",
-  "no-deploy": "Không cần deploy riêng",
-  research: "Research spike — chỉ cần phân tích",
-  "no-integration": "Không có cross-service changes",
-  "design-sprint": "Design sprint — chỉ cần design",
+  "api-only": "API-only — no need for Frontend/UI",
+  "backend-api": "API-only — no need for Frontend/UI",
+  "no-deploy": "No need for separate deploy",
+  research: "Research spike — only need analysis",
+  "no-integration": "No cross-service changes",
+  "design-sprint": "Design sprint — only need design",
   "devops-only": "DevOps-only task",
-  "frontend-only": "Frontend-only — không cần backend",
+  "frontend-only": "Frontend-only — no need for backend",
   "qa-only": "QA-only task",
 };
 
@@ -29,5 +29,5 @@ export function skipPresetSteps(preset: string): number[] {
 }
 
 export function skipReasonLabel(reasonType: string): string {
-  return SKIP_REASON_LABELS[reasonType] ?? "Không có lý do";
+  return SKIP_REASON_LABELS[reasonType] ?? "No reason";
 }

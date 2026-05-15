@@ -22,7 +22,7 @@ export async function runFlow(
     }
     default:
       throw new Error(
-        `Subcommand flow không hợp lệ: ${sub}. Usage: flowctl flow list | new | switch <id>`,
+        `Invalid subcommand: ${sub}. Usage: flowctl flow list | new | switch <id>`,
       );
   }
 }

@@ -19,7 +19,7 @@ const STATUS_ICONS: Record<string, string> = {
 export async function runStatusAll(ctx: FlowctlContext): Promise<void> {
   const registryFile = ctx.paths.registryFile;
   if (!(await pathExists(registryFile))) {
-    console.log(chalk.yellow("Registry chưa có (~/.flowctl/registry.json)."));
+    console.log(chalk.yellow("Registry not found (~/.flowctl/registry.json)."));
     return;
   }
   const registry = await readRegistry(registryFile);
@@ -125,5 +125,5 @@ export async function runStatus(
   console.log(`  Status:  ${chalk.yellow(state.overall_status)}`);
   console.log("");
   console.log(formatStatusOutput(state));
-  console.log(`\n  Dùng ${chalk.cyan("flowctl approve")} sau khi step hoàn thành\n`);
+  console.log(`\n  Use ${chalk.cyan("flowctl approve")} after step completes\n`);
 }

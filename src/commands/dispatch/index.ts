@@ -31,7 +31,7 @@ export type DispatchOptions = {
 
 function resolveMode(opts: DispatchOptions): DispatchMode {
   if (opts.launch && opts.headless) {
-    throw new Error("Không thể dùng đồng thời --launch và --headless.");
+    throw new Error("Cannot use both --launch and --headless.");
   }
   if (opts.headless) return "headless";
   if (opts.launch) return "launch";
@@ -68,7 +68,7 @@ export async function runDispatch(
   let roles = collectStepRoles(read.data, step);
   if (roles.length === 0) {
     throw new Error(
-      "ERROR|brief_generation|step has no agents assigned — kiểm tra flowctl-state.json",
+      "ERROR|brief_generation|step has no agents assigned — check flowctl-state.json",
     );
   }
 
@@ -117,7 +117,7 @@ export async function runDispatch(
 
   const relDispatch = dispatchDir.replace(`${ctx.projectRoot}/`, "");
   console.log(
-    chalk.green.bold(`\nDispatch bundles đã tạo: ${relDispatch}`),
+    chalk.green.bold(`\nDispatch bundles created: ${relDispatch}`),
   );
   console.log(`Trace: flow_id=${chalk.bold(flowId)} run_id=${chalk.bold(runId)}`);
 

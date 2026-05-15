@@ -69,7 +69,7 @@ export async function printSpawnBoard(opts: {
     console.log("");
   }
 
-  console.log(chalk.magenta.bold("━━━ Khi agents hoàn thành ━━━"));
+  console.log(chalk.magenta.bold("When agents are finished:"));
   console.log(chalk.bold("  flowctl collect\n"));
 
   const boardFile = join(opts.dispatchDir, "spawn-board.txt");

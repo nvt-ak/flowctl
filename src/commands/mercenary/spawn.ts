@@ -25,7 +25,7 @@ export async function runMercenarySpawn(
   const requests = await scanMercenaryRequests(reportsDir, ctx.projectRoot);
 
   if (requests.length === 0) {
-    console.log(chalk.green("✓ Không có mercenary requests.\n"));
+    console.log(chalk.green("✓ No mercenary requests.\n"));
     return;
   }
 
@@ -64,12 +64,12 @@ Priority: ${r.priority ?? "parallel"}
 ${r.query ?? ""}
 
 ## Output format
-Ghi kết quả vào: ${relOutput}
+Write results to: ${relOutput}
 `;
     await writeFile(briefFile, brief, "utf-8");
 
     console.log(
-      `  ━━━ [Tab ${i + 1}] @mercenary (${mercType}) — for @${r.requested_by} ━━━`,
+      `  ━━━ [Task ${i + 1}] @mercenary (${mercType}) — for @${r.requested_by} ━━━`,
     );
     console.log(`  Brief:  ${relBrief}`);
     console.log(`  Output: ${relOutput}`);
@@ -79,7 +79,7 @@ Ghi kết quả vào: ${relOutput}
     console.log("  └────────────────────────────────────────────────────────────┘\n");
   }
 
-  console.log(chalk.magenta.bold("━━━ Sau khi mercenaries hoàn thành: ━━━"));
+  console.log(chalk.magenta.bold("When mercenaries are finished:"));
   for (const r of requests) {
     console.log(
       chalk.bold(`  flowctl dispatch --role ${r.requested_by}  # re-run with mercenary output`),
@@ -87,7 +87,7 @@ Ghi kết quả vào: ${relOutput}
   }
   console.log(
     chalk.yellow(
-      `\nTimeout: mặc định ${timeout}s — flowctl mercenary spawn --timeout <seconds>\n`,
+      `\nTimeout: default ${timeout}s — flowctl mercenary spawn --timeout <seconds>\n`,
     ),
   );
 }

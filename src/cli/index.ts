@@ -9,11 +9,11 @@ import {
 } from "@/cli/context";
 import { runAssess } from "@/commands/assess";
 import { runApprove } from "@/commands/approve";
-import { runBlockerAdd, runBlockerResolve } from "@/commands/blocker";
+import { runBlockerAdd, runBlockerReconcile, runBlockerResolve } from "@/commands/blocker";
 import { runDecision } from "@/commands/decision";
 import { runGateCheck } from "@/commands/gate";
 import { runReject } from "@/commands/reject";
-import { runSkip } from "@/commands/skip";
+import { runSkip, runUnskip } from "@/commands/skip";
 import { runStart } from "@/commands/start";
 import { runStatus } from "@/commands/status";
 import { runDispatch } from "@/commands/dispatch/index";
@@ -181,6 +181,21 @@ program
   });
 
 program
+  .command("unskip")
+  .description("Đảo skip — đặt step về pending")
+  .requiredOption("-s, --step <n>", "Step number (1–9)")
+  .option("--reason <text>", "Lý do unskip")
+  .option("-r, --reason <text>", "Lý do (alias)")
+  .action(async (opts: Record<string, string | undefined>) => {
+    await runCommand("unskip", (ctx) =>
+      runUnskip(ctx, {
+        step: opts.step,
+        reason: opts.reason ?? opts.r,
+      }),
+    );
+  });
+
+program
   .command("assess")
   .description("Đánh giá steps để quyết định skip")
   .action(async () => {
@@ -203,6 +218,13 @@ blockerCmd
   .description("Resolve blocker")
   .action(async (id: string) => {
     await runCommand("blocker", (ctx) => runBlockerResolve(ctx, id));
+  });
+
+blockerCmd
+  .command("reconcile")
+  .description("Auto-resolve blockers khi điều kiện đã thỏa")
+  .action(async () => {
+    await runCommand("blocker", (ctx) => runBlockerReconcile(ctx));
   });
 
 program

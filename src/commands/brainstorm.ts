@@ -30,7 +30,7 @@ export async function runBrainstorm(
   if (!step) {
     const name = opts.project?.trim() || "Auto Brainstorm Project";
     console.log(
-      chalk.cyan(`Workflow chưa init, tự khởi tạo project: ${chalk.bold(name)}`),
+      chalk.cyan(`Workflow not initialized, auto init project: ${chalk.bold(name)}`),
     );
     await runInit(ctx, { project: name, noSetup: true });
     invalidateContextCache();
@@ -46,7 +46,7 @@ export async function runBrainstorm(
   if (opts.sync) {
     const w = opts.waitSeconds ?? 30;
     if (w > 0) {
-      console.log(chalk.yellow(`Đợi ${w}s trước khi sync...`));
+      console.log(chalk.yellow(`Wait ${w}s before sync...`));
       await delay(w * 1000);
     }
     await runTeam(working, "sync");

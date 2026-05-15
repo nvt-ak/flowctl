@@ -63,7 +63,7 @@ export async function runTeam(
       console.log(chalk.bold(`Current step: ${step} — ${stepName}`));
       console.log(`Spawn roles: ${chalk.yellow(roles)}`);
       if (stepStatus === "pending") {
-        console.log("Step đang pending, auto start...");
+        console.log("Step is pending, auto start...");
         await runStart(ctx);
       }
       console.log("Dispatch workers headless...");
@@ -123,7 +123,7 @@ export async function runTeam(
       console.log(chalk.bold(`Current step: ${step} — ${stepName}`));
       if (stepStatus === "pending") await runStart(ctx);
       await runDispatch(ctx, { ...dispatchOpts, headless: true });
-      console.log(chalk.yellow("Workers chạy nền. Sau đó: flowctl team sync\n"));
+      console.log(chalk.yellow("Workers running in background. Then: flowctl team sync\n"));
       return;
     }
     default:

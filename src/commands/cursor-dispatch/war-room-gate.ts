@@ -78,7 +78,7 @@ export function printWarRoomPause(
       `[cursor-dispatch] Complexity=${score}/5 (threshold=${threshold}) → War Room trước khi dispatch team`,
     ),
   );
-  console.log(chalk.yellow("⏸  Chờ War Room hoàn thành, sau đó:"));
+  console.log(chalk.yellow("⏸  Wait for War Room to finish, then:"));
   console.log(chalk.bold("  flowctl cursor-dispatch --merge"));
   console.log(chalk.bold("  flowctl cursor-dispatch --skip-war-room\n"));
 }

@@ -51,11 +51,11 @@ export async function runCollect(ctx: FlowctlContext): Promise<void> {
   if (result.noReports) {
     console.log(
       chalk.yellow(
-        `Chưa có worker report nào trong ${reportsDir.replace(ctx.projectRoot + "/", "")}.`,
+        `No worker reports in ${reportsDir.replace(ctx.projectRoot + "/", "")}.`,
       ),
     );
     console.log(
-      chalk.bold("Mẫu report: .cursor/templates/agent-dispatch-template.md\n"),
+      chalk.bold("Sample report: .cursor/templates/agent-dispatch-template.md\n"),
     );
     return;
   }
@@ -93,7 +93,7 @@ export async function runCollect(ctx: FlowctlContext): Promise<void> {
     dispatchBase: ctx.paths.dispatchBase,
   });
 
-  console.log(chalk.green.bold("\nCollect hoàn tất."));
+  console.log(chalk.green.bold("\nCollect completed."));
   const s = state.steps[step];
   console.log(
     `Step ${step}: deliverables=${s?.deliverables?.length ?? 0}, decisions=${s?.decisions?.length ?? 0}, blockers=${s?.blockers?.length ?? 0}`,
@@ -110,11 +110,11 @@ export async function runCollect(ctx: FlowctlContext): Promise<void> {
     );
     console.log(
       chalk.red(
-        "Một số DELIVERABLE: claims trỏ đến file không tồn tại trên disk.",
+        "Some DELIVERABLE: claims point to files that do not exist on disk.",
       ),
     );
     console.log(
-      chalk.red("→ Kiểm tra lại reports. Gate-check sẽ FAIL cho đến khi resolve.\n"),
+      chalk.red("→ Check reports. Gate-check will FAIL until resolved.\n"),
     );
   }
 

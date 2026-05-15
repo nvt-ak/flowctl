@@ -60,6 +60,6 @@ export async function runFork(
 
   console.log(`export FLOWCTL_ACTIVE_FLOW=${flowId}`);
   console.error(`[flowctl fork] Flow '${label}' → ${rel}`);
-  console.error("[flowctl fork] Shell isolado. Lệnh tiếp theo dùng flow riêng.");
-  console.error("[flowctl fork] Xem tất cả flows: flowctl flow list");
+  console.error("[flowctl fork] Shell isolated. Next command uses isolated flow.");
+  console.error("[flowctl fork] View all flows: flowctl flow list");
 }

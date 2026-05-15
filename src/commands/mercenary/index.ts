@@ -34,7 +34,7 @@ async function runMercenaryScan(ctx: FlowctlContext): Promise<void> {
 
   if (requests.length === 0) {
     console.log(
-      chalk.green(`✓ Không có NEEDS_SPECIALIST requests trong step ${step} reports.\n`),
+      chalk.green(`✓ No NEEDS_SPECIALIST requests in step ${step} reports.\n`),
     );
     return;
   }
@@ -47,5 +47,5 @@ async function runMercenaryScan(ctx: FlowctlContext): Promise<void> {
     console.log(`      query: ${r.query ?? "?"}`);
     console.log(`      blocking: ${r.blocking ?? "?"}\n`);
   });
-  console.log(chalk.bold("  Chạy flowctl mercenary spawn để tạo spawn board.\n"));
+  console.log(chalk.bold("  Run flowctl mercenary spawn to create spawn board.\n"));
 }

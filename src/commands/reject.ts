@@ -8,7 +8,7 @@ import { getStepName, requireCurrentStep } from "@/workflow/step-utils";
 
 export async function runReject(
   ctx: FlowctlContext,
-  reason = "Không có lý do",
+  reason = "No reason",
 ): Promise<void> {
   const stateFile = requireStateFile(ctx);
   const read = await readState(stateFile);
@@ -26,6 +26,6 @@ export async function runReject(
   });
 
   console.log(chalk.red.bold(`\n✗ Step ${step} — ${name}: REJECTED`));
-  console.log(`Lý do: ${reason}`);
-  console.log(chalk.bold("\nAddress concerns rồi chạy lại: flowctl approve\n"));
+  console.log(`Reason: ${reason}`);
+  console.log(chalk.bold("\nAddress concerns and run again: flowctl approve\n"));
 }

@@ -7,6 +7,7 @@ const BlockerSchema = z.object({
   resolved: z.boolean(),
   resolved_at: z.string().optional(),
   resolved_by: z.string().optional(),
+  resolution_note: z.string().optional(),
   source: z.string().optional(),
 });
 

@@ -91,7 +91,7 @@ export async function buildReleaseDashboardMarkdown(input: {
 }): Promise<string> {
   const { state, paths, step, projectRoot, gateOk, gateDetail } = input;
   const stepKey = String(step);
-  const stepObj = state.steps[stepKey] ?? {};
+  const stepObj = state.steps[stepKey] ?? { deliverables: [], blockers: [], decisions: [], approval_status: "pending" };
   const manifestPath = join(paths.evidenceDir, `step-${step}-manifest.json`);
   let manifest: { file_count?: number; signature?: string } = {};
   if (await pathExists(manifestPath)) {

@@ -82,24 +82,24 @@ export async function runComplexity(ctx: FlowctlContext): Promise<void> {
   let verdict: string;
   let color: (s: string) => string = chalk.green;
   if (tier === "MICRO") {
-    verdict = "1 agent, light ceremony → PM assign trực tiếp";
+    verdict = "1 agent, light ceremony → PM assign directly";
   } else if (tier === "STANDARD") {
     color = chalk.yellow;
-    verdict = `Score 2–3: brief + report; War Room khi score ≥ ${thr} (mặc định)`;
+    verdict = `Score 2–3: brief + report; War Room when score ≥ ${thr} (default)`;
   } else {
     color = chalk.red;
-    verdict = `Score 4–5: War Room (PM + TechLead) trước khi dispatch full team (ngưỡng ${thr})`;
+    verdict = `Score 4–5: War Room (PM + TechLead) BEFORE dispatching full team (threshold ${thr})`;
   }
 
   console.log(chalk.bold(`\nComplexity Score — Step ${step}`));
-  console.log(`  Score : ${color.bold(`${score} / 5`)} (${tier})`);
-  console.log(`  Tier  : ${color.bold(tier)}`);
+  console.log(`  Score : ${color(chalk.bold(`${score} / 5`))} (${tier})`);
+  console.log(`  Tier  : ${color(chalk.bold(tier))}`);
   console.log(
     `  War Room threshold: ${chalk.bold(String(thr))} (settings.war_room_threshold or WF_WAR_ROOM_THRESHOLD)`,
   );
   console.log(`  Action: ${verdict}\n`);
 
-  console.log(chalk.bold("Hybrid hints (read-only, không ghi state):"));
+  console.log(chalk.bold("Hybrid hints (read-only, no state writes):"));
   await printGraphifyHint(ctx.projectRoot);
   await printGitHint(ctx.projectRoot);
   console.log("");

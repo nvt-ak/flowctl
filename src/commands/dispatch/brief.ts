@@ -121,23 +121,23 @@ query_graph("component or flow")   ← if graph MCP enabled
     brief += `
 ---
 
-## Nhiệm vụ @${role}
+## Task @${role}
 
 **Skills:** Load only \`skills-to-load.compact\` from \`.cursor/agents/${role}-agent.md\`.
 
-1. Đọc Context Snapshot; \`wf_step_context()\` chỉ khi cần dữ liệu mới hơn snapshot
-2. Thực hiện scope @${role} cho step ${step}
-3. Quyết định quan trọng → DECISION trong report
-4. Block → NEEDS_SPECIALIST / BLOCKER (không dừng flowctl)
-5. Ghi report với EVIDENCE
+1. Read Context Snapshot; \`wf_step_context()\` only if state is newer than snapshot
+2. Execute scope @${role} for step ${step}
+3. Important decisions → DECISION in report
+4. Block → NEEDS_SPECIALIST / BLOCKER (do not stop flowctl)
+5. Write report with EVIDENCE
 
-## Report output — BẮT BUỘC
+## Report output — REQUIRED
 
 \`${reportPath}\`
 
 (relative: \`${reportRel}\`)
 
-**Quy tắc:** KHÔNG \`flowctl approve\`; KHÔNG advance step.
+**Rules:** DO NOT \`flowctl approve\`; DO NOT advance step.
 `;
     await writeFile(join(opts.dispatchDir, `${role}-brief.md`), brief, "utf-8");
   }

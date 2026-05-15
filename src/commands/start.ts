@@ -32,7 +32,7 @@ export async function runStart(ctx: FlowctlContext): Promise<void> {
     await setPath(stateFile, "overall_status", "completed");
     console.log(
       chalk.green.bold(
-        "\n🎉 WORKFLOW HOÀN THÀNH — tất cả steps đã complete/skipped.\n",
+        "\n🎉 WORKFLOW COMPLETED — all steps completed/skipped.\n",
       ),
     );
     return;
@@ -56,14 +56,14 @@ export async function runStart(ctx: FlowctlContext): Promise<void> {
 
   console.log(
     chalk.green.bold(
-      `\nStep ${step} (${activeIndex}/${activeCount} active) — ${name} đã bắt đầu`,
+      `\nStep ${step} (${activeIndex}/${activeCount} active) — ${name} started`,
     ),
   );
-  console.log(`Agent chính: ${chalk.yellow(`@${agent}`)}`);
+  console.log(`Main agent: ${chalk.yellow(`@${agent}`)}`);
   console.log("\nLoad workflow context:");
   console.log(`  ${chalk.cyan("wf_step_context()")}          ← decisions + blockers`);
   if (step >= 4) {
     console.log(`  ${chalk.cyan("cat graphify-out/GRAPH_REPORT.md")} ← code structure`);
   }
-  console.log(`\nXem agent guide: ${chalk.bold(`.cursor/agents/${agent}-agent.md`)}\n`);
+  console.log(`\nView agent guide: ${chalk.bold(`.cursor/agents/${agent}-agent.md`)}\n`);
 }

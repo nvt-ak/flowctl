@@ -60,7 +60,7 @@ export async function createContext(
 export function requireStateFile(ctx: FlowctlContext): string {
   if (!ctx.stateFile) {
     throw new Error(
-      "Không tìm thấy workflow state. Chạy: flowctl init --project \"Tên dự án\"",
+      "Workflow state not found. Run: flowctl init --project \"Project Name\"",
     );
   }
   return ctx.stateFile;

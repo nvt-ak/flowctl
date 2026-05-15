@@ -52,8 +52,8 @@ export async function runFlowNew(
     index.active_flow_id = flowId;
   });
 
-  console.log(chalk.green(`flow mới: ${flowId} → ${rel} (active)`));
+  console.log(chalk.green(`new flow: ${flowId} → ${rel} (active)`));
   console.log(
-    chalk.cyan(`Song song: terminal khác → export FLOWCTL_STATE_FILE=${dest}`),
+    chalk.cyan(`Parallel: export FLOWCTL_STATE_FILE=${dest}`),
   );
 }

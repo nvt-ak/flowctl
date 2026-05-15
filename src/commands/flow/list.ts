@@ -7,7 +7,7 @@ export async function runFlowList(ctx: FlowctlContext): Promise<void> {
   if (!index) {
     console.log(
       chalk.yellow(
-        "Chưa có .flowctl/flows.json — chạy: flowctl init hoặc flowctl flow new",
+        "No .flowctl/flows.json — run: flowctl init or flowctl flow new",
       ),
     );
     console.log(`STATE_FILE (resolved): ${ctx.stateFile ?? "<empty>"}`);

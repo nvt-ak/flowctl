@@ -3,7 +3,7 @@ import type { FlowctlState, Step } from "@/state/schema";
 export function requireCurrentStep(state: FlowctlState): number {
   const step = Number(state.current_step);
   if (!step || step === 0) {
-    throw new Error("Workflow chưa được khởi tạo. Chạy: flowctl init");
+    throw new Error("Workflow not initialized. Run: flowctl init");
   }
   return step;
 }

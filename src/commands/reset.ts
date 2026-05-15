@@ -43,16 +43,16 @@ export async function runReset(
   }
 
   console.log(
-    chalk.red.bold(`CẢNH BÁO: Reset flowctl về Step ${target}.`),
+    chalk.red.bold(`WARNING: Reset flowctl to Step ${target}.`),
   );
-  console.log(`Tất cả progress từ Step ${target} trở đi sẽ bị xóa.`);
+  console.log(`All progress from Step ${target} onwards will be deleted.`);
 
   if (!opts.yes) {
     const rl = readline.createInterface({ input, output });
-    const answer = await rl.question("Xác nhận? (yes/no): ");
+    const answer = await rl.question("Confirm? (yes/no): ");
     rl.close();
     if (answer.trim().toLowerCase() !== "yes") {
-      console.log("Hủy.");
+      console.log("Cancel.");
       return;
     }
   }
@@ -62,5 +62,5 @@ export async function runReset(
     (current) => resetStepsFrom(current, target),
     FlowctlStateSchema,
   );
-  console.log(`Workflow đã reset về Step ${target}`);
+  console.log(`Workflow reset to Step ${target}`);
 }
