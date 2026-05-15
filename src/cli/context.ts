@@ -16,6 +16,23 @@ export function workflowRootFromModule(): string {
   return resolve(fileURLToPath(new URL("../..", import.meta.url)));
 }
 
+/** CLI session cache — invalidate after `init` / bootstrap changes state path. */
+let cachedContext: Promise<FlowctlContext> | null = null;
+
+export function invalidateContextCache(): void {
+  cachedContext = null;
+}
+
+export async function getOrCreateContext(
+  cwd = process.cwd(),
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<FlowctlContext> {
+  if (!cachedContext) {
+    cachedContext = createContext(cwd, env);
+  }
+  return cachedContext;
+}
+
 export async function createContext(
   cwd = process.cwd(),
   env: NodeJS.ProcessEnv = process.env,

@@ -2,7 +2,11 @@
 import { Command } from "commander";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createContext, type FlowctlContext } from "@/cli/context";
+import {
+  getOrCreateContext,
+  invalidateContextCache,
+  type FlowctlContext,
+} from "@/cli/context";
 import { runAssess } from "@/commands/assess";
 import { runApprove } from "@/commands/approve";
 import { runBlockerAdd, runBlockerResolve } from "@/commands/blocker";
@@ -17,6 +21,14 @@ import { runCursorDispatch } from "@/commands/cursor-dispatch/index";
 import { runFlow } from "@/commands/flow/index";
 import { runFork } from "@/commands/fork";
 import { runCollect } from "@/commands/collect";
+import { runPlan } from "@/commands/plan";
+import { runRetro } from "@/commands/retro";
+import { runBrainstorm } from "@/commands/brainstorm";
+import { runReset } from "@/commands/reset";
+import { runSummary } from "@/commands/summary";
+import { runHistory } from "@/commands/history";
+import { runReleaseDashboard } from "@/commands/release-dashboard";
+import { runInit } from "@/commands/init";
 import { runComplexity } from "@/commands/complexity";
 import { runBudgetStatus } from "@/commands/budget";
 import { runWarRoom } from "@/commands/war-room/index";
@@ -54,14 +66,10 @@ const FLOW_LOCKED_COMMANDS = new Set([
   "assess",
 ]);
 
-let ctxPromise: Promise<FlowctlContext> | null = null;
 const lockReleases = new Map<string, () => Promise<void>>();
 
 async function getContext(): Promise<FlowctlContext> {
-  if (!ctxPromise) {
-    ctxPromise = createContext(process.cwd(), process.env);
-  }
-  return ctxPromise;
+  return getOrCreateContext(process.cwd(), process.env);
 }
 
 async function withFlowLock<T>(
@@ -480,6 +488,128 @@ addDispatchPassThrough(
 teamCmd.action(async () => {
   await runCommand("team", (ctx) => runTeam(ctx, "status"));
 });
+
+program
+  .command("plan")
+  .description("Generate workflows/plans/plan.md from state")
+  .alias("plan-md")
+  .action(async () => {
+    await runCommand("plan", runPlan);
+  });
+
+program
+  .command("generate-plan")
+  .description("Alias: generate plan.md from state")
+  .action(async () => {
+    await runCommand("plan", runPlan);
+  });
+
+program
+  .command("retro [step]")
+  .description("Post-approve retro — lessons → retro/lessons.json")
+  .action(async (step?: string) => {
+    await runCommand("retro", (ctx) => runRetro(ctx, step));
+  });
+
+program
+  .command("brainstorm")
+  .description("Auto init (if needed) + team delegate; optional topic as extra args")
+  .alias("bs")
+  .option("--project <name>", "Project name when auto-init")
+  .option("--sync", "Wait and run team sync")
+  .option("--wait <seconds>", "Seconds before sync when --sync", "30")
+  .option("--launch", "Pass through to dispatch")
+  .option("--headless", "Pass through to dispatch")
+  .option("--trust", "Pass through to dispatch")
+  .option("--dry-run", "Pass through to dispatch")
+  .option("--force-run", "Pass through to dispatch")
+  .option("--max-retries <n>", "Pass through to dispatch")
+  .option("--role <name>", "Pass through to dispatch")
+  .allowExcessArguments(true)
+  .action(async function (this: Command) {
+    const o = this.opts() as Record<string, string | boolean | undefined>;
+    const tail = this.args as string[];
+    const waitRaw = typeof o.wait === "string" ? o.wait : "30";
+    const waitSeconds = Number(waitRaw);
+    await runCommand("brainstorm", (ctx) =>
+      runBrainstorm(ctx, {
+        project: typeof o.project === "string" ? o.project : undefined,
+        sync: o.sync === true,
+        waitSeconds: Number.isFinite(waitSeconds) ? waitSeconds : 30,
+        topic: tail.length ? tail.join(" ") : undefined,
+        dispatch: {
+          launch: o.launch === true,
+          headless: o.headless === true,
+          trust: o.trust === true,
+          dryRun: o.dryRun === true,
+          forceRun: o.forceRun === true,
+          maxRetries: typeof o.maxRetries === "string" ? o.maxRetries : undefined,
+          role: typeof o.role === "string" ? o.role : undefined,
+        },
+      }),
+    );
+  });
+
+program
+  .command("summary")
+  .description("Tóm tắt step hiện tại")
+  .alias("sum")
+  .action(async () => {
+    await runCommand("summary", runSummary);
+  });
+
+program
+  .command("history")
+  .description("Lịch sử approvals")
+  .alias("h")
+  .action(async () => {
+    await runCommand("history", runHistory);
+  });
+
+program
+  .command("release-dashboard")
+  .description("PM release summary markdown")
+  .alias("dashboard")
+  .option("--step <n>", "Step number")
+  .option("--no-write", "Print only, do not write file")
+  .action(async (opts: { step?: string; noWrite?: boolean }) => {
+    await runCommand("release-dashboard", (ctx) =>
+      runReleaseDashboard(ctx, {
+        step: opts.step !== undefined ? Number(opts.step) : undefined,
+        noWrite: opts.noWrite === true,
+      }),
+    );
+  });
+
+program
+  .command("reset <step>")
+  .description("Reset workflow về step (interactive)")
+  .option("-y, --yes", "Skip confirmation")
+  .action(async (step: string, opts: { yes?: boolean }) => {
+    await runCommand("reset", (ctx) => runReset(ctx, step, { yes: opts.yes }));
+  });
+
+program
+  .command("init")
+  .description("Khởi tạo project (partial TS — MCP merge Phase 4 nếu FLOWCTL_ENGINE=ts)")
+  .option("--project <name>", "Tên dự án")
+  .option("--overwrite", "Ghi đè scaffold / reset active flow state")
+  .option("--no-setup", "Bỏ qua setup.sh")
+  .action(async (opts: { project?: string; overwrite?: boolean; noSetup?: boolean }) => {
+    try {
+      const ctx = await getContext();
+      await runInit(ctx, {
+        project: opts.project,
+        overwrite: opts.overwrite === true,
+        noSetup: opts.noSetup === true,
+      });
+      invalidateContextCache();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(message);
+      process.exitCode = 1;
+    }
+  });
 
 program
   .command("fork")
