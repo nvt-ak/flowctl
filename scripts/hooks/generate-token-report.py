@@ -8,6 +8,11 @@ import json, sys, argparse, os
 from pathlib import Path
 from datetime import datetime
 
+_scripts = Path(__file__).resolve().parent.parent
+if str(_scripts) not in sys.path:
+    sys.path.insert(0, str(_scripts))
+from lib.state_resolver import resolve_state_file  # noqa: E402
+
 REPO      = Path(__file__).resolve().parent.parent.parent
 # v1.1+: runtime data lives in FLOWCTL_CACHE_DIR (~/.flowctl/projects/*/cache/).
 # Fallback to legacy .cache/mcp/ for pre-v1.1 projects.
@@ -15,7 +20,11 @@ _cache_default = str(REPO / ".cache" / "mcp")
 CACHE     = Path(os.environ.get("FLOWCTL_CACHE_DIR", _cache_default))
 EVENTS_F  = Path(os.environ.get("FLOWCTL_EVENTS_F",  str(CACHE / "events.jsonl")))
 STATS_F   = Path(os.environ.get("FLOWCTL_STATS_F",   str(CACHE / "session-stats.json")))
-STATE_F   = Path(os.environ.get("FLOWCTL_STATE_FILE", str(REPO / "flowctl-state.json")))
+if os.environ.get("FLOWCTL_STATE_FILE"):
+    STATE_F = Path(os.environ["FLOWCTL_STATE_FILE"])
+else:
+    _resolved = resolve_state_file(REPO)
+    STATE_F = _resolved if _resolved is not None else (REPO / "flowctl-state.json")
 
 PRICE = {"input": 3.0, "output": 15.0}
 

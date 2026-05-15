@@ -2,8 +2,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$REPO_ROOT/test/helpers/flowctl_state_path.sh"
 WORKFLOW="$REPO_ROOT/scripts/flowctl.sh"
-STATE_FILE="$REPO_ROOT/flowctl-state.json"
 RUNTIME_DIR="$REPO_ROOT/workflows/runtime"
 BUDGET_STATE_FILE="$RUNTIME_DIR/budget-state.json"
 TRACEABILITY_FILE="$RUNTIME_DIR/traceability-map.jsonl"
@@ -16,8 +17,12 @@ SUMMARY_FILE="$RUN_DIR/summary.md"
 mkdir -p "$RUN_DIR"
 mkdir -p "$RUNTIME_DIR"
 
-if [[ ! -f "$STATE_FILE" ]]; then
-  echo "Missing flowctl-state.json" >&2
+if [[ ! -x "$WORKFLOW" ]]; then
+  chmod +x "$WORKFLOW"
+fi
+
+if ! flowctl_ensure_repo_state "$REPO_ROOT" "$WORKFLOW"; then
+  echo "Cannot resolve or create workflow state under $REPO_ROOT" >&2
   exit 1
 fi
 
@@ -70,6 +75,7 @@ log "# Chaos Suite Run ($STAMP)"
 log "repo=$REPO_ROOT"
 
 expect_success "Initialize flowctl baseline" bash "$WORKFLOW" init --no-setup --project "Chaos Regression"
+flowctl_refresh_repo_state "$REPO_ROOT" || true
 expect_success "Start step 1 baseline" bash "$WORKFLOW" start
 
 _FL_SHORT="$(python3 -c "import json; fid=json.load(open('$STATE_FILE')).get('flow_id',''); print(fid[3:11] if fid else '')" 2>/dev/null || echo "")"

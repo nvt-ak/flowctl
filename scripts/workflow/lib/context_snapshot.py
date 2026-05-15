@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a compact Context Snapshot markdown from flowctl-state.json (compile-once for briefs/digests)."""
+"""Build a compact Context Snapshot markdown from workflow state JSON (flows-first path or legacy root)."""
 from __future__ import annotations
 
 import json
@@ -94,7 +94,7 @@ _Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} — compile-once; use
 ### Context digest path
 {digest_note}
 
-> **When to call `wf_step_context()`**: after edits to `flowctl-state.json`, new blockers/decisions, or if this snapshot is stale. Otherwise prefer this block + code layers below.
+> **When to call `wf_step_context()`**: after edits to workflow state (`.flowctl/flows/.../state.json` or `FLOWCTL_STATE_FILE`), new blockers/decisions, or if this snapshot is stale. Otherwise prefer this block + code layers below.
 """
 
 

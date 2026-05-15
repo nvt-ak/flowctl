@@ -3,43 +3,10 @@
 
 FLOWCTL_FLOWS_JSON="$REPO_ROOT/.flowctl/flows.json"
 
-# If legacy flowctl-state.json exists at repo root and no index yet, move it into .flowctl/flows/<short>/ (preserve flow_id).
-_flow_migrate_legacy_root_if_needed() {
-  [[ -f "$FLOWCTL_FLOWS_JSON" ]] && return 0
-  local root_s="$REPO_ROOT/flowctl-state.json"
-  [[ -f "$root_s" ]] || return 0
-  [[ -L "$root_s" ]] && return 0
-  WF_REPO="$REPO_ROOT" WF_ROOT_STATE="$root_s" python3 - <<'PY' || true
-import json, os, shutil
-from pathlib import Path
-repo = Path(os.environ["WF_REPO"])
-root = Path(os.environ["WF_ROOT_STATE"])
-try:
-    data = json.loads(root.read_text(encoding="utf-8"))
-except Exception:
-    raise SystemExit(0)
-fid = (data.get("flow_id") or "").strip()
-if not fid or not fid.startswith("wf-"):
-    raise SystemExit(0)
-short = fid.replace("wf-", "").replace("-", "")[:8] or "legacy"
-dest_dir = repo / ".flowctl" / "flows" / short
-dest_dir.mkdir(parents=True, exist_ok=True)
-dest = dest_dir / "state.json"
-if dest.is_file():
-    raise SystemExit(0)
-rel = str(dest.relative_to(repo))
-shutil.move(str(root), str(dest))
-idx = {"version": 1, "active_flow_id": fid, "flows": {fid: {"state_file": rel, "label": "migrated-root"}}}
-(repo / ".flowctl" / "flows.json").parent.mkdir(parents=True, exist_ok=True)
-(repo / ".flowctl" / "flows.json").write_text(json.dumps(idx, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-print(f"Migrated legacy state to {dest} (flow {fid})")
-PY
-}
-
 cmd_flow_list() {
   if [[ ! -f "$FLOWCTL_FLOWS_JSON" ]]; then
-    wf_info "Chưa có .flowctl/flows.json — đang dùng state mặc định: flowctl-state.json"
-    wf_info "STATE_FILE (resolved): $STATE_FILE"
+    wf_info "Chưa có .flowctl/flows.json — chạy: ${WORKFLOW_CLI_CMD} init hoặc ${WORKFLOW_CLI_CMD} flow new"
+    wf_info "STATE_FILE (resolved): ${STATE_FILE:-<empty>}"
     return 0
   fi
   python3 - "$FLOWCTL_FLOWS_JSON" "$STATE_FILE" <<'PY'
@@ -103,31 +70,40 @@ p.write_text(json.dumps(idx, indent=2, ensure_ascii=False) + "\n", encoding="utf
 print(f"active_flow_id set to {match}")
 PY
   [[ "$_py_rc" -eq 0 ]] || exit "$_py_rc"
-  _flow_try_symlink_active
   wf_success "Đã switch flow. MCP/terminal mới: export FLOWCTL_ACTIVE_FLOW= hoặc reload; wf_state đọc từ resolve."
 }
 
-# Symlink REPO_ROOT/flowctl-state.json -> active flow state (Unix); best-effort.
-_flow_try_symlink_active() {
-  [[ -f "$FLOWCTL_FLOWS_JSON" ]] || return 0
-  local rel abs
-  rel="$(python3 -c "
-import json
-p='$FLOWCTL_FLOWS_JSON'
-d=json.load(open(p,encoding='utf-8'))
-a=d.get('active_flow_id') or ''
-print((d.get('flows') or {}).get(a, {}).get('state_file', '') or '')
-")" 2>/dev/null || return 0
-  [[ -n "$rel" ]] || return 0
-  abs="$REPO_ROOT/$rel"
-  if command -v ln &>/dev/null && [[ -f "$abs" ]]; then
-    rm -f "$REPO_ROOT/flowctl-state.json" 2>/dev/null || true
-    (cd "$REPO_ROOT" && ln -sf "$rel" flowctl-state.json) 2>/dev/null || true
-  fi
-}
-
 cmd_flow_new() {
-  wf_acquire_flow_lock
+  # NOTE: do NOT acquire the main flow lock here.
+  # `flow new` only writes to flows.json and a brand-new state file — it never
+  # touches the currently-active state file.  Holding the current flow lock
+  # would block parallel-window users from creating an independent flow while
+  # another flowctl command is running in a different terminal.
+  # Use a lightweight per-flows.json advisory lock instead.
+  local _flows_lock_dir="$REPO_ROOT/.flowctl/flows.new.lock"
+  local _flows_lock_acquired=false
+  if mkdir "$_flows_lock_dir" 2>/dev/null; then
+    echo "$$" > "$_flows_lock_dir/pid"
+    trap 'rm -rf "$_flows_lock_dir" 2>/dev/null || true' EXIT
+    _flows_lock_acquired=true
+  else
+    local _fl_holder="unknown"
+    [[ -f "$_flows_lock_dir/pid" ]] && _fl_holder="$(<"$_flows_lock_dir/pid")"
+    # Stale check
+    if [[ "$_fl_holder" =~ ^[1-9][0-9]*$ ]]; then
+      kill -0 "$_fl_holder" 2>/dev/null || {
+        rm -rf "$_flows_lock_dir" 2>/dev/null
+        mkdir "$_flows_lock_dir" 2>/dev/null && echo "$$" > "$_flows_lock_dir/pid" && _flows_lock_acquired=true
+      }
+    else
+      rm -rf "$_flows_lock_dir" 2>/dev/null
+      mkdir "$_flows_lock_dir" 2>/dev/null && echo "$$" > "$_flows_lock_dir/pid" && _flows_lock_acquired=true
+    fi
+    if ! $_flows_lock_acquired; then
+      wf_warn "flows.json đang được cập nhật bởi tiến trình khác (pid=$_fl_holder). Thử lại sau."
+      exit 1
+    fi
+  fi
   local label="" proj_name=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -139,7 +115,6 @@ cmd_flow_new() {
   if [[ -z "$proj_name" && -f "$STATE_FILE" ]]; then
     proj_name="$(python3 -c "import json;print(json.load(open('$STATE_FILE',encoding='utf-8')).get('project_name','') or '')" 2>/dev/null || true)"
   fi
-  _flow_migrate_legacy_root_if_needed
   mkdir -p "$REPO_ROOT/.flowctl"
   local template_state="$WORKFLOW_ROOT/templates/flowctl-state.template.json"
   [[ -f "$template_state" ]] || { wf_error "Thiếu template: $template_state"; exit 1; }
@@ -204,7 +179,6 @@ p.write_text(json.dumps(idx, indent=2, ensure_ascii=False) + "\n", encoding="utf
 PY
   fi
 
-  _flow_try_symlink_active
   wf_success "flow mới: $fid → $dest (active). Resolver: .flowctl/flows.json"
   wf_info "Song song: terminal khác → export FLOWCTL_STATE_FILE=$dest"
 }

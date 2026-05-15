@@ -195,8 +195,10 @@ update_gitignore() {
     ".env"
     ".env.local"
     # flowctl runtime data — volatile, never commit
+    # .flowctl/          = flows index + per-flow state (local-only unless team opts in)
     # .flowctl/projects/ = per-project cache/runtime under global home (if pointed inside repo)
     # .flowctl-local/    = legacy workaround when ~/.flowctl was not writable
+    ".flowctl/"
     ".flowctl/projects/"
     ".flowctl-local/"
   )
@@ -243,7 +245,7 @@ print_summary() {
   echo ""
   echo -e "  ${CYAN}Files quan trọng:${NC}"
   echo -e "  • CLAUDE.md          — Orchestration guide cho agents"
-  echo -e "  • flowctl-state.json — Trạng thái flowctl hiện tại"
+  echo -e "  • .flowctl/ (gitignored) — local flows index + per-flow state; legacy root flowctl-state.json is migrated on first load"
   echo -e "  • .cursor/mcp.json   — MCP server configuration"
   echo -e "  • graphify-out/graph.json — Codebase knowledge graph"
   echo ""

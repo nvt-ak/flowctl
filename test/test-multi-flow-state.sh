@@ -26,10 +26,10 @@ OUT="$(FLOWCTL_PROJECT_ROOT="$TMP/repo" REPO_ROOT="$TMP/repo" FLOWCTL_STATE_FILE
 python3 -c "import json,sys; d=json.load(sys.stdin); assert d['source']=='env_state_file'; assert d['state_file'].endswith('b.json')" <<<"$OUT" \
   || fail "absolute FLOWCTL_STATE_FILE"
 
-# Default path when no index
+# Uninitialized repo: no flows.json and no legacy root file → not_initialized, empty state_file
 OUT="$(FLOWCTL_PROJECT_ROOT="$TMP/repo" REPO_ROOT="$TMP/repo" python3 "$RESOLVER")"
-python3 -c "import json,sys; d=json.load(sys.stdin); assert d['source']=='default'; assert d['state_file'].endswith('flowctl-state.json')" <<<"$OUT" \
-  || fail "default root state path"
+python3 -c "import json,sys; d=json.load(sys.stdin); assert d['source']=='not_initialized', d; assert d['state_file']==''" <<<"$OUT" \
+  || fail "not_initialized when no flows index and no legacy state"
 
 # flows.json active_flow_id → state_file
 mkdir -p "$TMP/repo/.flowctl/flows/zz"

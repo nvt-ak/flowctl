@@ -5,6 +5,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKFLOW="$REPO_ROOT/scripts/flowctl.sh"
+# shellcheck disable=SC1091
+source "$REPO_ROOT/test/helpers/flowctl_state_path.sh"
 STAMP="$(date '+%Y%m%d-%H%M%S')"
 TEST_DIR="$(mktemp -d)"
 PASS=0
@@ -61,9 +63,13 @@ new_project() {
 # Compute DISPATCH_BASE for a given project dir (mirrors config.sh logic)
 project_dispatch_base() {
   local proj_dir="$1"
-  local state="$proj_dir/flowctl-state.json"
-  local fl_short
-  fl_short="$(python3 -c "import json; fid=json.load(open('$state')).get('flow_id',''); print(fid[3:11] if fid else '')" 2>/dev/null || echo "")"
+  local state fl_short
+  state="$(flowctl_resolve_state_for_project "$proj_dir")"
+  if [[ -z "$state" || ! -f "$state" ]]; then
+    echo "$proj_dir/workflows/dispatch"
+    return
+  fi
+  fl_short="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding="utf-8")); fid=d.get("flow_id") or ""; print(fid[3:11] if fid.startswith("wf-") and len(fid)>=11 else "")' "$state" 2>/dev/null || echo "")"
   if [[ -n "$fl_short" ]]; then
     echo "$proj_dir/workflows/$fl_short/dispatch"
   else
@@ -80,7 +86,7 @@ log ""
 log "=== FIX 1: Gate state-fallback counts report deliverables correctly ==="
 
 _proj=$(new_project "GateFallbackTest")
-_state="$_proj/flowctl-state.json"
+_state="$(flowctl_resolve_state_for_project "$_proj")"
 _reports="$(project_dispatch_base "$_proj")/step-1/reports"
 
 # Advance to in_progress
@@ -195,7 +201,7 @@ PROJECT_ROOT="$_proj3" bash "$WORKFLOW" approve --by "PM" --note "micro task: re
 assert_equals "$_a_rc" "0" "approve succeeds after MICRO collect+gate"
 
 # Step should advance to 2
-_step=$(python3 -c "import json; print(json.load(open('$_proj3/flowctl-state.json'))['current_step'])")
+_step=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1],encoding='utf-8'))['current_step'])" "$(flowctl_resolve_state_for_project "$_proj3")")
 assert_equals "$_step" "2" "MICRO approve advances to step 2"
 
 # ============================================================
@@ -247,11 +253,7 @@ log "=== FIX 5: gate rejects approve when step is still pending ==="
 _proj5=$(new_project "StartRequiredTest")
 
 # Don't run start — step remains pending
-_step_status=$(python3 -c "
-import json
-s = json.load(open('$_proj5/flowctl-state.json'))
-print(s['steps']['1']['status'])
-")
+_step_status=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1],encoding='utf-8'))['steps']['1']['status'])" "$(flowctl_resolve_state_for_project "$_proj5")")
 assert_equals "$_step_status" "pending" "step is pending after init"
 
 # gate-check should fail with status error
@@ -260,11 +262,7 @@ assert_contains "$_g_out" "GATE_FAIL" "gate fails when step is pending"
 
 # After flowctl start, step moves to in_progress
 PROJECT_ROOT="$_proj5" bash "$WORKFLOW" start >/dev/null 2>&1
-_step_status2=$(python3 -c "
-import json
-s = json.load(open('$_proj5/flowctl-state.json'))
-print(s['steps']['1']['status'])
-")
+_step_status2=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1],encoding='utf-8'))['steps']['1']['status'])" "$(flowctl_resolve_state_for_project "$_proj5")")
 assert_equals "$_step_status2" "in_progress" "flowctl start moves step to in_progress"
 
 # ============================================================

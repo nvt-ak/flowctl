@@ -6,10 +6,10 @@ Priority:
   1. FLOWCTL_STATE_FILE — absolute or relative to REPO_ROOT
   2. FLOWCTL_ACTIVE_FLOW — flow_id (wf-...) matched against .flowctl/flows.json or ~/.flowctl/projects/*/meta.json
   3. .flowctl/flows.json active_flow_id entry
-  4. REPO_ROOT/flowctl-state.json
+  4. (none) → {"state_file": "", "source": "not_initialized"} — config.sh may run legacy migrate
 
 Prints one JSON object to stdout (single line) for bash parsing:
-  {"state_file": "<abs>", "source": "env_state_file|env_active_flow|flows_json|default"}
+  {"state_file": "<abs or empty>", "source": "env_state_file|env_active_flow|flows_json|not_initialized"}
 """
 from __future__ import annotations
 
@@ -82,7 +82,7 @@ def resolve_state_file(
     env_state_file: str | None,
     env_active_flow: str | None,
     flowctl_home: Path,
-) -> tuple[Path, str]:
+) -> tuple[Path | None, str]:
     repo = repo.resolve()
     repo_norm = _norm(str(repo))
 
@@ -110,8 +110,8 @@ def resolve_state_file(
         if found is not None:
             return found, "env_active_flow"
 
-    default = (repo / "flowctl-state.json").resolve()
-    return default, "default"
+    # No env path, no flows entry, no registry hit — flows-first uninitialized (no default root path).
+    return None, "not_initialized"
 
 
 def main() -> int:
@@ -131,7 +131,7 @@ def main() -> int:
         env_active_flow=os.environ.get("FLOWCTL_ACTIVE_FLOW"),
         flowctl_home=home,
     )
-    out = {"state_file": str(state), "source": src}
+    out = {"state_file": str(state) if state is not None else "", "source": src}
     print(json.dumps(out, ensure_ascii=False))
     return 0
 

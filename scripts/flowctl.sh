@@ -84,6 +84,9 @@ source "$LIB_DIR/reporting.sh"
 # shellcheck source=/dev/null
 source "$LIB_DIR/flow_cli.sh"
 
+# shellcheck source=/dev/null
+source "$LIB_DIR/bootstrap_init_flow.sh"
+
 # ── Export home dir env vars for subprocesses (node, python, bash) ──
 export FLOWCTL_HOME FLOWCTL_DATA_DIR FLOWCTL_CACHE_DIR FLOWCTL_RUNTIME_DIR \
        FLOWCTL_EVENTS_F FLOWCTL_STATS_F
@@ -118,32 +121,13 @@ _scaffold_dir() {
 
 ensure_project_scaffold() {
   local overwrite_existing="${1:-false}"
-  local template_state="$WORKFLOW_ROOT/templates/flowctl-state.template.json"
-  local had_state="false"
   local had_settings="false"
-  local state_status="skipped"
   local mcp_status="skipped"
   local settings_status="skipped"
 
   mkdir -p "$PROJECT_ROOT/.cursor" "$PROJECT_ROOT/.claude"
 
-  [[ -f "$STATE_FILE" ]] && had_state="true"
   [[ -f "$PROJECT_ROOT/.claude/settings.json" ]] && had_settings="true"
-
-  if [[ ! -f "$STATE_FILE" || "$overwrite_existing" == "true" ]]; then
-    if [[ -f "$template_state" ]]; then
-      cp "$template_state" "$STATE_FILE"
-      if [[ "$had_state" == "true" ]]; then
-        state_status="overwritten"
-      else
-        state_status="created"
-      fi
-    else
-      wf_error "Không tìm thấy flowctl state template: $template_state"
-      wf_info "Hành động đề xuất: kiểm tra lại file template trong templates/ trước khi chạy init."
-      exit 1
-    fi
-  fi
 
   local merge_py="$WORKFLOW_ROOT/scripts/merge_cursor_mcp.py"
   if [[ ! -f "$merge_py" ]]; then
@@ -309,8 +293,7 @@ ensure_project_scaffold() {
   fi
 
   wf_info "Scaffold status:"
-  [[ "$state_status" == "created" || "$state_status" == "overwritten" ]] && \
-    wf_success "flowctl-state.json: $state_status" || wf_warn "flowctl-state.json: $state_status"
+  [[ -n "${STATE_FILE:-}" ]] && wf_info "Workflow state: $STATE_FILE"
   [[ "$mcp_status" == "created" || "$mcp_status" == "overwritten" || "$mcp_status" == "merged" || "$mcp_status" == "unchanged" || "$mcp_status" == "skipped_permission_denied" ]] && \
     wf_success ".cursor/mcp.json: $mcp_status" || wf_warn ".cursor/mcp.json: $mcp_status"
   [[ "$hooks_status" == "created" || "$hooks_status" == "overwritten" || "$hooks_status" == "unchanged" ]] && \
@@ -403,18 +386,14 @@ cmd_init() {
     esac
   done
 
-  # Capture whether this is a brand-new project BEFORE scaffold writes the state file.
-  # Setup (Graphify, gitnexus, mcp.json) should only run on first init or explicit --overwrite.
-  # Re-running `flowctl init` on an existing project should NOT reinstall/re-index tools.
+  [[ -z "$project_name" ]] && project_name="$(basename "$PROJECT_ROOT")"
+
   local is_new_project="false"
-  [[ ! -f "$STATE_FILE" ]] && is_new_project="true"
+  [[ -z "${STATE_FILE:-}" || ! -f "$STATE_FILE" ]] && is_new_project="true"
   [[ "$overwrite_existing" == "true" ]] && is_new_project="true"
 
-  # Preserve existing flow_id BEFORE scaffold may overwrite flowctl-state.json (--overwrite).
-  # Without this, --overwrite wipes the state → Python generates a NEW UUID → dedup grep
-  # finds nothing → creates a duplicate ~/.flowctl/projects dir every time.
   local _preserved_flow_id=""
-  if [[ -f "$STATE_FILE" ]]; then
+  if [[ -n "${STATE_FILE:-}" && -f "$STATE_FILE" ]]; then
     _preserved_flow_id=$(WF_STATE_FILE="$STATE_FILE" python3 - <<'PY'
 import json, os, sys
 from pathlib import Path
@@ -428,11 +407,10 @@ PY
     ) || true
   fi
 
+  _bootstrap_init_flow "$project_name" "$overwrite_existing"
+  flowctl_refresh_runtime_paths
+  wf_acquire_flow_lock
   ensure_project_scaffold "$overwrite_existing"
-
-  # Default project name = current folder name (no interactive prompt needed).
-  # Override with: flowctl init --project "My Custom Name"
-  [[ -z "$project_name" ]] && project_name="$(basename "$PROJECT_ROOT")"
 
   # Pass all shell variables via env — never interpolate user input into python3 -c strings
   # (shell injection: project_name with ' or ` would close the string and execute code).
@@ -681,8 +659,8 @@ cmd_status() {
   [[ "${1:-}" == "--all" ]] && { cmd_status_all; return; }
 
   [[ ! -f "$STATE_FILE" ]] && {
-    wf_error "Không tìm thấy flowctl-state.json."
-    wf_info "Hành động đề xuất: chạy ${WORKFLOW_CLI_CMD} init --project \"Tên dự án\""
+    wf_error "Không tìm thấy workflow state (STATE_FILE không resolve được hoặc file không tồn tại)."
+    wf_info "Hành động đề xuất: chạy ${WORKFLOW_CLI_CMD} init --project \"Tên dự án\" hoặc export FLOWCTL_STATE_FILE=..."
     exit 1
   }
 
@@ -1385,7 +1363,7 @@ case "$CMD" in
 esac
 
 case "$CMD" in
-  init|start|gate-check|approve|reject|conditional|blocker|decision|dispatch|cursor-dispatch|collect|team|reset|brainstorm|release-dashboard|war-room|mercenary|retro|complexity|audit-tokens|audit|skip|unskip|assess)
+  start|gate-check|approve|reject|conditional|blocker|decision|dispatch|cursor-dispatch|collect|team|reset|brainstorm|release-dashboard|war-room|mercenary|retro|complexity|audit-tokens|audit|skip|unskip|assess)
     wf_acquire_flow_lock
     ;;
   *)

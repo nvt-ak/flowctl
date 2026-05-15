@@ -2,7 +2,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-STATE_FILE="$REPO_ROOT/flowctl-state.json"
+# shellcheck disable=SC1091
+source "$REPO_ROOT/test/helpers/flowctl_state_path.sh"
 WORKFLOW_SCRIPT="$REPO_ROOT/scripts/flowctl.sh"
 ARTIFACT_DIR="$REPO_ROOT/workflows/evidence"
 STAMP="$(date '+%Y%m%d-%H%M%S')"
@@ -12,13 +13,13 @@ SUMMARY_FILE="$RUN_DIR/summary.md"
 
 mkdir -p "$RUN_DIR"
 
-if [[ ! -f "$STATE_FILE" ]]; then
-  echo "Missing $STATE_FILE" >&2
-  exit 1
-fi
-
 if [[ ! -x "$WORKFLOW_SCRIPT" ]]; then
   chmod +x "$WORKFLOW_SCRIPT"
+fi
+
+if ! flowctl_ensure_repo_state "$REPO_ROOT" "$WORKFLOW_SCRIPT"; then
+  echo "Cannot resolve or create workflow state under $REPO_ROOT" >&2
+  exit 1
 fi
 
 BACKUP_FILE="$RUN_DIR/flowctl-state.backup.json"
@@ -54,6 +55,7 @@ echo "- Timestamp: \`$STAMP\`" >> "$SUMMARY_FILE"
 echo "" >> "$SUMMARY_FILE"
 
 run_cmd "Initialize flowctl" bash "$WORKFLOW_SCRIPT" init --no-setup --project "E2E Skill Validation"
+flowctl_refresh_repo_state "$REPO_ROOT" || true
 STATUS_OUTPUT="$(bash "$WORKFLOW_SCRIPT" status)"
 echo "$STATUS_OUTPUT" | tee -a "$LOG_FILE" >/dev/null
 assert_contains "Step 1" "$STATUS_OUTPUT" "status after init"

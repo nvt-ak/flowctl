@@ -9,6 +9,29 @@ from datetime import datetime, timezone
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 
+# flows-first state resolution (shared with hooks)
+_sys_path_root = Path(__file__).resolve().parent.parent
+if str(_sys_path_root) not in sys.path:
+    sys.path.insert(0, str(_sys_path_root))
+from lib.state_resolver import resolve_state_file  # noqa: E402
+
+
+def _flowctl_project_signals(r: Path) -> bool:
+    r = r.resolve()
+    if (r / ".flowctl" / "flows.json").is_file():
+        return True
+    if resolve_state_file(r) is not None:
+        return True
+    return (r / "flowctl-state.json").exists()
+
+
+def _state_path_for_project(proj_path: str) -> str:
+    root = Path(proj_path)
+    resolved = resolve_state_file(root)
+    if resolved is not None:
+        return str(resolved)
+    return str(root / "flowctl-state.json")
+
 # REPO = project root where the user ran `flowctl monitor`.
 # For global installs, __file__ is inside the npm global dir — use FLOWCTL_PROJECT_ROOT
 # (set by flowctl.sh) or cwd as the project root, not the script directory.
@@ -38,18 +61,19 @@ def _detect_repo() -> Path:
             import sys
             print(f"[monitor-web] WARNING: FLOWCTL_PROJECT_ROOT={_env_root!r} is not readable; "
                   f"falling back to cwd={_cwd_root!r}", file=sys.stderr)
-        elif (_env_root / "flowctl-state.json").exists():
+        elif _flowctl_project_signals(_env_root):
             return _env_root
         else:
             import sys
             print(f"[monitor-web] WARNING: FLOWCTL_PROJECT_ROOT={_env_root!r} has no "
-                  f"flowctl-state.json; falling back to cwd={_cwd_root!r}", file=sys.stderr)
-    if (_cwd_root / "flowctl-state.json").exists():
+                  f"flowctl project markers (.flowctl/flows.json / state); falling back to cwd={_cwd_root!r}", file=sys.stderr)
+    if _flowctl_project_signals(_cwd_root):
         return _cwd_root
     return _script_parent  # local install fallback
 
 REPO         = _detect_repo()
-STATE_F      = REPO / "flowctl-state.json"
+_resolved    = resolve_state_file(REPO)
+STATE_F      = _resolved if _resolved is not None else (REPO / "flowctl-state.json")
 
 # Prefer FLOWCTL_CACHE_DIR / _EVENTS_F / _STATS_F set by flowctl.sh (v1.1+ home dir layout).
 # Fallback: legacy .cache/mcp/ inside the project root (pre-v1.1 or no env vars).
@@ -109,7 +133,7 @@ def discover_projects() -> dict:
 
     Primary source: meta.json files written by `flowctl init` (v1.1+ layout).
     Secondary source: legacy registry.json (pre-v1.1 backward compat).
-    Fallback: current REPO's flowctl-state.json (local install / in-project run).
+    Fallback: current REPO's resolved state or legacy flowctl-state.json.
     """
     now_ts = datetime.now(timezone.utc).timestamp()
     result: dict = {}
@@ -159,8 +183,13 @@ def discover_projects() -> dict:
             result[pid] = proj
 
     # --- Fallback: current REPO (in-project run or local install) ---
-    local_state = REPO / "flowctl-state.json"
-    if local_state.exists() and not any(p.get("path") == str(REPO) for p in result.values()):
+    local_state = resolve_state_file(REPO)
+    if local_state is None:
+        legacy = REPO / "flowctl-state.json"
+        local_state = legacy if legacy.is_file() else None
+    if local_state is not None and local_state.is_file() and not any(
+        p.get("path") == str(REPO) for p in result.values()
+    ):
         try:
             s   = json.loads(local_state.read_text())
             pid = s.get("flow_id", "_local")
@@ -1308,7 +1337,7 @@ class MonitorHandler(BaseHTTPRequestHandler):
                 try:
                     pdata = build_project_data(
                         cache_dir,
-                        str(Path(proj_path) / "flowctl-state.json")
+                        _state_path_for_project(proj_path)
                     )
                     pdata["active"] = proj.get("active", False)
                     # active_seconds_ago: seconds since last event file change
@@ -1405,7 +1434,7 @@ def main():
                 if not pid or pid == cur_pid:
                     continue
                 cdir  = meta.get("cache_dir", str(entry / "cache"))
-                spath = str(Path(meta.get("path", "")) / "flowctl-state.json")
+                spath = _state_path_for_project(meta.get("path", "") or "")
                 ef    = Path(cdir) / "events.jsonl"
                 # Register eagerly — FileWatcher tolerates non-existent paths and
                 # will begin tracking as soon as the file is created.

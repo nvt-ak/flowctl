@@ -2,8 +2,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$REPO_ROOT/test/helpers/flowctl_state_path.sh"
 WORKFLOW="$REPO_ROOT/scripts/flowctl.sh"
-STATE_FILE="$REPO_ROOT/flowctl-state.json"
 POLICY_FILE="$REPO_ROOT/workflows/policies/budget-policy.v1.json"
 TEST_ROOT="$REPO_ROOT/workflows/evidence/tdd"
 STAMP="$(date '+%Y%m%d-%H%M%S')"
@@ -58,14 +59,9 @@ if [[ -f "$BUDGET_TPL" ]]; then
   cp "$BUDGET_TPL" "$POLICY_FILE"
 fi
 
-if [[ ! -f "$STATE_FILE" ]]; then
-  TPL="$REPO_ROOT/templates/flowctl-state.template.json"
-  if [[ -f "$TPL" ]]; then
-    cp "$TPL" "$STATE_FILE"
-  else
-    echo "Missing flowctl-state.json and template: $TPL" >&2
-    exit 1
-  fi
+if ! flowctl_ensure_repo_state "$REPO_ROOT" "$WORKFLOW"; then
+  echo "Cannot resolve or create workflow state under $REPO_ROOT" >&2
+  exit 1
 fi
 
 BACKUP_STATE="$RUN_DIR/flowctl-state.backup.json"
@@ -75,9 +71,13 @@ if [[ -f "$POLICY_FILE" ]]; then
   cp "$POLICY_FILE" "$BACKUP_POLICY"
 fi
 
+_recompute_flowctl_lock_dir() {
+  FLOWCTL_TEST_LOCK_HASH="$(SF="$STATE_FILE" python3 -c 'import hashlib, os; print(hashlib.sha256(os.environ["SF"].encode()).hexdigest()[:16])')"
+  FLOWCTL_TEST_LOCK_DIR="$REPO_ROOT/.flowctl/locks/$FLOWCTL_TEST_LOCK_HASH"
+}
+
 # Per-state-file lock dir (must match scripts/workflow/lib/config.sh — not legacy .flowctl-lock).
-FLOWCTL_TEST_LOCK_HASH="$(SF="$STATE_FILE" python3 -c 'import hashlib, os; print(hashlib.sha256(os.environ["SF"].encode()).hexdigest()[:16])')"
-FLOWCTL_TEST_LOCK_DIR="$REPO_ROOT/.flowctl/locks/$FLOWCTL_TEST_LOCK_HASH"
+_recompute_flowctl_lock_dir
 
 cleanup() {
   cp "$BACKUP_STATE" "$STATE_FILE"
@@ -152,6 +152,8 @@ log "# TDD Regression Run ($STAMP)"
 log "repo=$REPO_ROOT"
 
 expect_success "Initialize isolated test flowctl" bash "$WORKFLOW" init --no-setup --project "TDD Regression"
+flowctl_refresh_repo_state "$REPO_ROOT" || true
+_recompute_flowctl_lock_dir
 # Resolve runtime paths NOW that flow_id has been written by init
 _update_runtime_paths
 rm -f "$BUDGET_STATE_FILE"   # ensure fresh budget counters
@@ -373,6 +375,8 @@ PY
 assert_contains "$gate_events" "\"status\": \"BYPASS\"" "gate report should include BYPASS event"
 assert_contains "$gate_events" "\"actor\": \"TDD-BYPASS\"" "gate report should include bypass actor"
 
+flowctl_refresh_repo_state "$REPO_ROOT" || true
+_recompute_flowctl_lock_dir
 rm -rf "$FLOWCTL_TEST_LOCK_DIR"
 expect_failure "Mutating command should fail when active lock held" bash -lc "mkdir -p \"${FLOWCTL_TEST_LOCK_DIR%/*}\" && mkdir \"$FLOWCTL_TEST_LOCK_DIR\" && echo \"\$\$\" > \"$FLOWCTL_TEST_LOCK_DIR/pid\" && bash \"$WORKFLOW\" decision \"lock-conflict\""
 rm -rf "$FLOWCTL_TEST_LOCK_DIR"

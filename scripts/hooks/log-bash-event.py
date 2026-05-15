@@ -13,6 +13,11 @@ import json, sys, re, os
 from pathlib import Path
 from datetime import datetime
 
+_scripts = Path(__file__).resolve().parent.parent
+if str(_scripts) not in sys.path:
+    sys.path.insert(0, str(_scripts))
+from lib.state_resolver import resolve_state_file  # noqa: E402
+
 # Claude Code runs hooks with cwd = project root; FLOWCTL_PROJECT_ROOT overrides for manual use
 REPO = Path(os.environ.get('FLOWCTL_PROJECT_ROOT', os.getcwd()))
 
@@ -60,9 +65,14 @@ EVENTS  = Path(os.environ.get('FLOWCTL_EVENTS_F', str(_cache_dir / "events.jsonl
 STATS_F = Path(os.environ.get('FLOWCTL_STATS_F',  str(_cache_dir / "session-stats.json")))
 
 def _read_project_identity() -> tuple:
-    state_f = REPO / "flowctl-state.json"
+    state_f = resolve_state_file(REPO)
+    if state_f is None:
+        legacy = REPO / "flowctl-state.json"
+        state_f = legacy if legacy.is_file() else None
+    if state_f is None or not state_f.is_file():
+        return "", REPO.name
     try:
-        s = json.loads(state_f.read_text(encoding="utf-8")) if state_f.exists() else {}
+        s = json.loads(state_f.read_text(encoding="utf-8"))
         return s.get("flow_id", ""), s.get("project_name", REPO.name)
     except Exception:
         return "", REPO.name
