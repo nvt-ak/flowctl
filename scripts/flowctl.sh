@@ -1471,8 +1471,10 @@ json.dump(d, open(sys.argv[1],'w',encoding='utf-8'), indent=2, ensure_ascii=Fals
 
   # Register in flows.json — but do NOT change active_flow_id
   # (the global default stays untouched; only this shell's env var changes)
-  local _flock_dir="$REPO_ROOT/.flowctl/flows.new.lock"
-  mkdir "$_flock_dir" 2>/dev/null || true
+  if ! _wf_acquire_flows_index_lock; then
+    echo "# [flowctl fork] ERROR: could not acquire flows.json lock (concurrent update?)" >&2
+    exit 1
+  fi
   if [[ ! -f "$flows_json" ]]; then
     WF_FLOWS_JSON="$flows_json" WF_FID="$fid" WF_REL="$rel" WF_LABEL="$label" \
     python3 - <<'PY'
@@ -1498,7 +1500,7 @@ idx.setdefault("flows", {})[fid] = {"state_file": rel, "label": label}
 p.write_text(json.dumps(idx, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 PY
   fi
-  rm -rf "$_flock_dir" 2>/dev/null || true
+  _wf_release_flows_index_lock
 
   # ── Stdout: eval-able export (this is what the shell captures) ──
   echo "export FLOWCTL_ACTIVE_FLOW=$fid"

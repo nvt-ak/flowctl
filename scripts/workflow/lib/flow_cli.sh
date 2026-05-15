@@ -2,6 +2,56 @@
 # Multi-flow CLI: list / new / switch — state files under .flowctl/flows/ + .flowctl/flows.json
 
 FLOWCTL_FLOWS_JSON="$REPO_ROOT/.flowctl/flows.json"
+_FLOWS_INDEX_LOCK_DIR=""
+
+_wf_try_acquire_flows_index_lock_once() {
+  _FLOWS_INDEX_LOCK_DIR="$REPO_ROOT/.flowctl/flows.new.lock"
+  if mkdir "$_FLOWS_INDEX_LOCK_DIR" 2>/dev/null; then
+    echo "$$" > "$_FLOWS_INDEX_LOCK_DIR/pid"
+    return 0
+  fi
+
+  local holder="unknown"
+  if [[ -f "$_FLOWS_INDEX_LOCK_DIR/pid" ]]; then
+    holder="$(<"$_FLOWS_INDEX_LOCK_DIR/pid")"
+  fi
+  local _stale=false
+  if [[ "$holder" =~ ^[1-9][0-9]*$ ]]; then
+    kill -0 "$holder" 2>/dev/null || _stale=true
+  else
+    _stale=true
+  fi
+  if $_stale; then
+    rm -rf "$_FLOWS_INDEX_LOCK_DIR" 2>/dev/null || true
+    if mkdir "$_FLOWS_INDEX_LOCK_DIR" 2>/dev/null; then
+      echo "$$" > "$_FLOWS_INDEX_LOCK_DIR/pid"
+      return 0
+    fi
+  fi
+  return 1
+}
+
+_wf_release_flows_index_lock() {
+  if [[ -n "$_FLOWS_INDEX_LOCK_DIR" ]]; then
+    rm -rf "$_FLOWS_INDEX_LOCK_DIR" 2>/dev/null || true
+    _FLOWS_INDEX_LOCK_DIR=""
+  fi
+}
+
+# Serialize flows.json read-modify-write (flow new, fork). Retries for concurrent callers.
+_wf_acquire_flows_index_lock() {
+  local max_retries="${1:-40}"
+  local attempt=0
+  while [[ "$attempt" -lt "$max_retries" ]]; do
+    if _wf_try_acquire_flows_index_lock_once; then
+      trap '_wf_release_flows_index_lock' EXIT
+      return 0
+    fi
+    attempt=$((attempt + 1))
+    sleep "0.0$(( (RANDOM % 9) + 1 ))"
+  done
+  return 1
+}
 
 cmd_flow_list() {
   if [[ ! -f "$FLOWCTL_FLOWS_JSON" ]]; then
@@ -79,30 +129,10 @@ cmd_flow_new() {
   # touches the currently-active state file.  Holding the current flow lock
   # would block parallel-window users from creating an independent flow while
   # another flowctl command is running in a different terminal.
-  # Use a lightweight per-flows.json advisory lock instead.
-  local _flows_lock_dir="$REPO_ROOT/.flowctl/flows.new.lock"
-  local _flows_lock_acquired=false
-  if mkdir "$_flows_lock_dir" 2>/dev/null; then
-    echo "$$" > "$_flows_lock_dir/pid"
-    trap 'rm -rf "$_flows_lock_dir" 2>/dev/null || true' EXIT
-    _flows_lock_acquired=true
-  else
-    local _fl_holder="unknown"
-    [[ -f "$_flows_lock_dir/pid" ]] && _fl_holder="$(<"$_flows_lock_dir/pid")"
-    # Stale check
-    if [[ "$_fl_holder" =~ ^[1-9][0-9]*$ ]]; then
-      kill -0 "$_fl_holder" 2>/dev/null || {
-        rm -rf "$_flows_lock_dir" 2>/dev/null
-        mkdir "$_flows_lock_dir" 2>/dev/null && echo "$$" > "$_flows_lock_dir/pid" && _flows_lock_acquired=true
-      }
-    else
-      rm -rf "$_flows_lock_dir" 2>/dev/null
-      mkdir "$_flows_lock_dir" 2>/dev/null && echo "$$" > "$_flows_lock_dir/pid" && _flows_lock_acquired=true
-    fi
-    if ! $_flows_lock_acquired; then
-      wf_warn "flows.json đang được cập nhật bởi tiến trình khác (pid=$_fl_holder). Thử lại sau."
-      exit 1
-    fi
+  # Lightweight per-flows.json advisory lock (no main workflow lock).
+  if ! _wf_acquire_flows_index_lock; then
+    wf_warn "flows.json đang được cập nhật bởi tiến trình khác. Thử lại sau."
+    exit 1
   fi
   local label="" proj_name=""
   while [[ $# -gt 0 ]]; do
