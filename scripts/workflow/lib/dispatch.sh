@@ -181,6 +181,13 @@ try:
         except Exception:
             snapshot_md = "_Context snapshot unavailable._\n"
 
+    snap_file = dispatch_dir / "context-snapshot.md"
+    try:
+        snap_file.write_text(snapshot_md, encoding="utf-8")
+    except OSError:
+        pass
+    snap_rel = str(snap_file.relative_to(repo_root)) if snap_file.is_file() else ""
+
     for role in roles:
         brief_path = dispatch_dir / f"{role}-brief.md"
         report_path = reports_dir / f"{role}-report.md"
@@ -189,9 +196,9 @@ try:
 
         brief = f"""# Worker Brief — @{role} — Step {step}: {step_name}
 
-## Context Snapshot (compile-once — đọc trước)
+## Context (compile-once)
 
-{snapshot_md}
+Read **`@{snap_rel}`** — Context Snapshot (FRESH/STALE indicator inside). Do **not** call `wf_step_context()` when snapshot is **FRESH** unless you edited workflow state.
 
 ### Layer 1 — Workflow (chỉ gọi `wf_step_context()` khi cần dữ liệu mới hơn snapshot)
 ```
@@ -234,6 +241,8 @@ query_graph("component or flow to understand")   ← code structure only (if gra
 
 ## 📋 Nhiệm vụ của @{role}
 
+**Skills:** Load only `skills-to-load.compact` from `.cursor/agents/{role}-agent.md` (use `/load-skill` if needed). Do not preload full skill trees unless the brief requires it.
+
 1. Đọc **Context Snapshot** trong brief; gọi `wf_step_context()` chỉ khi cần dữ liệu mới hơn snapshot; sau đó Layer 2 → 3 → 4, dừng khi đủ
 2. Thực hiện công việc scope của @{role} cho step {step}
 3. Mọi quyết định quan trọng → ghi vào report (DECISION section)
@@ -263,6 +272,9 @@ Ghi vào đường dẫn tuyệt đối này (tạo thư mục nếu chưa có):
 
 ## BLOCKERS
 - BLOCKER: [mô tả] / NONE
+
+## SUGGESTED_SKIPS (optional — PM review sau collect)
+- SUGGESTED_SKIP: <step_number> | <lý do ngắn, ví dụ CLI-only không cần UI>
 
 ## NEEDS_SPECIALIST (optional — nếu cần mercenary)
 - type: researcher|security-auditor|ux-validator|tech-validator|data-analyst
@@ -705,6 +717,8 @@ new_decisions = 0
 new_blockers = 0
 new_deliverables = 0
 new_unverified = 0
+suggested_skips = []
+seen_skip_steps = set()
 
 for rf in report_files:
     rel = str(rf.relative_to(repo_root))
@@ -763,6 +777,25 @@ for rf in report_files:
                 if not verified:
                     new_unverified += 1
                 new_deliverables += 1
+        elif s.startswith("SUGGESTED_SKIP:"):
+            body = s[len("SUGGESTED_SKIP:"):].strip()
+            if "|" in body:
+                step_part, reason = body.split("|", 1)
+            elif "—" in body:
+                step_part, reason = body.split("—", 1)
+            else:
+                step_part, reason = body, ""
+            step_part = step_part.strip()
+            reason = reason.strip()
+            if step_part.isdigit():
+                sn = int(step_part)
+                if 1 <= sn <= 9 and sn not in seen_skip_steps:
+                    seen_skip_steps.add(sn)
+                    suggested_skips.append({
+                        "step": sn,
+                        "reason": reason or "from worker report",
+                        "source": rel,
+                    })
 
 data["metrics"]["total_decisions"] = max(data["metrics"].get("total_decisions", 0), 0) + new_decisions
 data["metrics"]["total_blockers"] = max(data["metrics"].get("total_blockers", 0), 0) + new_blockers
@@ -782,6 +815,9 @@ if idempotency_path.exists():
     idempotency_path.write_text(json.dumps(idempotency, indent=2, ensure_ascii=False), encoding="utf-8")
 
 print(f"COLLECTED reports={len(report_files)} deliverables+={new_deliverables} decisions+={new_decisions} blockers+={new_blockers} unverified={new_unverified}")
+for sk in suggested_skips:
+    reason = sk["reason"].replace("|", "/")
+    print(f"SUGGESTED_SKIP|{sk['step']}|{reason}|{sk['source']}")
 PY
 )
   local collect_status="$?"
@@ -862,6 +898,31 @@ PY
   merc_requests=$(wf_mercenary_scan "$step" 2>/dev/null || echo "[]")
   local merc_count
   merc_count=$(echo "$merc_requests" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
+
+  local skip_lines=()
+  while IFS= read -r _skip_line; do
+    [[ "$_skip_line" == SUGGESTED_SKIP\|* ]] && skip_lines+=("$_skip_line")
+  done < <(printf '%s\n' "$collect_raw")
+
+  if [[ ${#skip_lines[@]} -gt 0 ]]; then
+    echo ""
+    echo -e "${CYAN}${BOLD}Suggested workflow skips (from worker reports):${NC}"
+    local _sk_row _sk_step _sk_reason _sk_src
+    for _sk_row in "${skip_lines[@]}"; do
+      IFS='|' read -r _sk_tag _sk_step _sk_reason _sk_src <<< "$_sk_row"
+      echo -e "  Step ${BOLD}${_sk_step}${NC}: ${_sk_reason}"
+      echo -e "    (source: ${_sk_src})"
+      echo -e "    ${BOLD}${WORKFLOW_CLI_CMD} skip --step ${_sk_step} --reason \"${_sk_reason}\"${NC}"
+      if [[ -t 0 ]]; then
+        local _sk_ans=""
+        read -r -p "    Apply this skip now? [y/N]: " _sk_ans || true
+        if [[ "$_sk_ans" =~ ^[Yy]$ ]]; then
+          "${WORKFLOW_CLI_CMD:-flowctl}" skip --step "$_sk_step" --reason "$_sk_reason" || true
+        fi
+      fi
+    done
+    echo ""
+  fi
 
   if [[ "$merc_count" -gt 0 ]]; then
     echo ""

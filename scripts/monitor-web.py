@@ -10,7 +10,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 
 # flows-first state resolution (shared with hooks)
-_sys_path_root = Path(__file__).resolve().parent.parent
+_sys_path_root = Path(__file__).resolve().parent
 if str(_sys_path_root) not in sys.path:
     sys.path.insert(0, str(_sys_path_root))
 from lib.state_resolver import resolve_state_file  # noqa: E402

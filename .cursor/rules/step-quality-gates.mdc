@@ -1,0 +1,33 @@
+---
+description: Code quality gates for Steps 4–8 — load for implementation, review, and merge work
+alwaysApply: false
+globs:
+  - "**/*.{ts,tsx,js,jsx,py,go,rs,java,kt,php,rb}"
+---
+
+# Step quality gates (code steps)
+
+> Extends slim `core-rules.mdc`. Full policy: `@.cursor/rules/core-rules-full.mdc`
+
+## Before merge
+
+| Gate | Threshold |
+|------|-----------|
+| Lint errors | 0 |
+| TypeScript strict errors | 0 |
+| Test coverage — lines / branches / functions | ≥ 80% / ≥ 75% / ≥ 85% |
+| SAST (Critical / High) | 0 |
+| Dependency CVEs (CVSS ≥ 9.0) | 0 |
+| Secret scan | 0 |
+| Cyclomatic complexity | ≤ 10 per function |
+| Function length | ≤ 50 lines |
+
+Naming: files kebab-case; classes PascalCase; functions camelCase; DB snake_case; env UPPER_SNAKE_CASE.
+
+## Security & performance (summary)
+
+- Auth on endpoints; authz at service layer
+- Validate input at API boundary; parameterized queries only
+- Secrets in env / secret manager; no PII in logs
+- Paginate lists (default 20, max 100); no N+1; connection pooling
+- Frontend: LCP < 2.5s, INP < 200ms, CLS < 0.1 (or product SLO)

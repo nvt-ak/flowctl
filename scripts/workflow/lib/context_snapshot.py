@@ -9,7 +9,13 @@ from datetime import datetime
 from pathlib import Path
 
 
-def build_snapshot(state_path: Path, step: str, repo_root: Path) -> str:
+def build_snapshot(
+    state_path: Path,
+    step: str,
+    repo_root: Path,
+    *,
+    generated_at: datetime | None = None,
+) -> str:
     data = json.loads(state_path.read_text(encoding="utf-8"))
     step = str(step or data.get("current_step", "1"))
     steps = data.get("steps") or {}
@@ -72,9 +78,16 @@ def build_snapshot(state_path: Path, step: str, repo_root: Path) -> str:
         if skipped_steps else ""
     )
 
+    at = generated_at or datetime.now()
+    age_minutes = (datetime.now() - at).total_seconds() / 60.0
+    if age_minutes < 30:
+        freshness = "**FRESH** (< 30 min) — prefer this file; skip `wf_step_context()` unless you edited state"
+    else:
+        freshness = f"**⚠ STALE** ({int(age_minutes)} min ago) — call `wf_state()` to verify step/status before work"
+
     return f"""## Context Snapshot (Step {step}: {step_name})
 
-_Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} — compile-once; use `wf_step_context()` only if you need newer state than this block._
+_Generated: {at.strftime("%Y-%m-%d %H:%M:%S")} — {freshness}_
 
 | Field | Value |
 |-------|-------|

@@ -138,7 +138,8 @@ cmd_complexity() {
   local tier
   tier=$(wf_complexity_tier "$score")
 
-  local thr="${WF_WAR_ROOM_THRESHOLD:-4}"
+  local thr
+  thr=$(wf_war_room_threshold)
 
   local label verdict color
   case "$tier" in
@@ -159,7 +160,7 @@ cmd_complexity() {
   echo -e "\n${BOLD}Complexity Score — Step $step${NC}"
   echo -e "  Score : ${color}${BOLD}$score / 5${NC} ($label)"
   echo -e "  Tier  : ${color}${BOLD}$tier${NC}"
-  echo -e "  War Room threshold: ${BOLD}${thr}${NC} (WF_WAR_ROOM_THRESHOLD)"
+  echo -e "  War Room threshold: ${BOLD}${thr}${NC} (settings.war_room_threshold or WF_WAR_ROOM_THRESHOLD)"
   echo -e "  Action: $verdict\n"
 
   echo -e "${BOLD}Hybrid hints (read-only, không ghi state):${NC}"

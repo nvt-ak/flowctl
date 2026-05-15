@@ -59,6 +59,7 @@ p.write_text('\n'.join(lines) + '\n')
 # Warn once per day if shell-proxy MCP is not wired up correctly.
 # Called at flowctl start and flowctl cursor-dispatch — non-blocking.
 wf_mcp_health_check() {
+  [[ "${WF_SKIP_MCP_HEALTH:-0}" == "1" ]] && return 0
   # Dedup: warn at most once per calendar day (same mechanism as deprecation warnings)
   local today seen_file marker
   today=$(date +%Y-%m-%d 2>/dev/null || echo "0000-00-00")
@@ -73,7 +74,7 @@ wf_mcp_health_check() {
   # 1. .cursor/mcp.json missing → Cursor won't start any MCP server for this project
   local mcp_json="$REPO_ROOT/.cursor/mcp.json"
   if [[ ! -f "$mcp_json" ]]; then
-    issues+=("`.cursor/mcp.json` chưa có — MCP servers chưa được cấu hình cho project này.")
+    issues+=('.cursor/mcp.json chưa có — MCP servers chưa được cấu hình cho project này.')
   else
     # 2. mcp.json có shell-proxy nhưng thiếu FLOWCTL_HOME
     if python3 -c "

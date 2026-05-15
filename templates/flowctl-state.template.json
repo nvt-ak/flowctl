@@ -21,5 +21,8 @@
   "graphify": { "last_indexed": null, "graph_path": ".graphify/graph.json", "snapshots": [] },
   "gitnexus": { "last_analyzed": null, "total_changes_tracked": 0 },
   "metrics": { "total_blockers": 0, "total_decisions": 0, "steps_completed": 0, "on_schedule": true },
+  "settings": {
+    "war_room_threshold": null
+  },
   "flow_id": ""
 }

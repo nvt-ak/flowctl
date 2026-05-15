@@ -5,6 +5,70 @@
 
 WF_WAR_ROOM_THRESHOLD="${WF_WAR_ROOM_THRESHOLD:-4}"
 
+# Resolve threshold: state.settings.war_room_threshold → WF_WAR_ROOM_THRESHOLD env → 4
+wf_war_room_threshold() {
+  WF_STATE_FILE="$STATE_FILE" WF_WAR_ROOM_THRESHOLD="${WF_WAR_ROOM_THRESHOLD:-}" python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+path = Path(os.environ["WF_STATE_FILE"])
+data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+settings = data.get("settings") or {}
+v = settings.get("war_room_threshold")
+if v is not None and str(v).strip() != "":
+    print(int(v))
+    raise SystemExit(0)
+env = (os.environ.get("WF_WAR_ROOM_THRESHOLD") or "").strip()
+if env.isdigit():
+    print(int(env))
+    raise SystemExit(0)
+print(4)
+PY
+}
+
+# War Room outputs newer than state file → safe to reuse (skip re-brief)
+_wf_war_room_outputs_fresh() {
+  local wr_dir="$1"
+  [[ -d "$wr_dir" ]] || return 1
+  WF_WR_DIR="$wr_dir" WF_STATE_FILE="$STATE_FILE" python3 - <<'PY'
+import os
+import sys
+from pathlib import Path
+
+wr = Path(os.environ["WF_WR_DIR"])
+state = Path(os.environ["WF_STATE_FILE"])
+pm = wr / "pm-analysis.md"
+tl = wr / "tech-lead-assessment.md"
+outs = [p for p in (pm, tl) if p.is_file()]
+if not outs:
+    sys.exit(1)
+state_ts = state.stat().st_mtime if state.is_file() else 0
+wr_ts = max(p.stat().st_mtime for p in outs)
+sys.exit(0 if wr_ts > state_ts else 1)
+PY
+}
+
+_wf_war_room_invalidate_step() {
+  local step="$1"
+  [[ -n "$step" ]] || return 0
+  local digest="$DISPATCH_BASE/step-$step/context-digest.md"
+  rm -f "$digest" 2>/dev/null || true
+}
+
+_wf_war_room_ensure_digest() {
+  local step="$1" step_name="$2" wr_dir="$3"
+  local digest_file="$DISPATCH_BASE/step-$step/context-digest.md"
+  local mode="full"
+  if [[ ! -f "$wr_dir/pm-analysis.md" && ! -f "$wr_dir/tech-lead-assessment.md" ]]; then
+    mode="simple"
+  fi
+  if [[ -f "$digest_file" ]] && _wf_war_room_outputs_fresh "$wr_dir"; then
+    return 0
+  fi
+  _war_room_generate_digest "$step" "$step_name" "$wr_dir" "$mode"
+}
+
 cmd_war_room() {
   local step
   step=$(wf_require_initialized_workflow)
@@ -16,11 +80,20 @@ cmd_war_room() {
   # Check complexity
   local score
   score=$(wf_complexity_score "$step")
-  local thr="${WF_WAR_ROOM_THRESHOLD:-4}"
+  local thr
+  thr=$(wf_war_room_threshold)
   if [[ "$score" -lt "$thr" ]]; then
     echo -e "${GREEN}[war-room]${NC} Complexity score=$score (< $thr) — War Room skipped."
     echo -e "  → Generating context digest directly...\n"
     _war_room_generate_digest "$step" "$step_name" "$wr_dir" "simple"
+    return 0
+  fi
+
+  if _wf_war_room_outputs_fresh "$wr_dir"; then
+    echo -e "${GREEN}[war-room]${NC} Reusing PM/TechLead outputs (newer than state) — skip regeneration."
+    _wf_war_room_ensure_digest "$step" "$step_name" "$wr_dir"
+    echo -e "  Context digest: ${CYAN}${DISPATCH_BASE#$REPO_ROOT/}/step-${step}/context-digest.md${NC}"
+    echo -e "  Tiếp tục: ${BOLD}flowctl cursor-dispatch --skip-war-room${NC} hoặc ${BOLD}flowctl cursor-dispatch --merge${NC}\n"
     return 0
   fi
 
@@ -69,6 +142,11 @@ _war_room_generate_briefs() {
   if [[ -f "$snap_py" ]]; then
     snap_md="$(WF_DISPATCH_BASE="$DISPATCH_BASE" python3 "$snap_py" "$STATE_FILE" "$step" "$REPO_ROOT" 2>/dev/null || true)"
   fi
+  local snap_file="$wr_dir/context-snapshot.md"
+  if [[ -n "$snap_md" ]]; then
+    printf '%s' "$snap_md" > "$snap_file"
+  fi
+  local snap_rel="${snap_file#"$REPO_ROOT"/}"
 
   # Load lessons from prior retros
   local lessons_file="$RETRO_DIR/lessons.json"
@@ -109,9 +187,9 @@ PY
 ## Nhiệm vụ
 Bạn là PM Agent. Đây là War Room phase — phân tích scope và business objectives TRƯỚC khi dispatch team.
 
-## Context Snapshot (đọc trước — giảm lặp MCP)
+## Context (compile-once)
 
-$snap_md
+Read **`@$snap_rel`** — Context Snapshot (FRESH/STALE inside). Skip `wf_step_context()` when **FRESH**.
 
 ### Khi cần dữ liệu mới hơn snapshot
 \`\`\`
@@ -155,9 +233,9 @@ BRIEF
 ## Nhiệm vụ
 Bạn là Tech Lead. Đây là War Room phase — đánh giá feasibility kỹ thuật TRƯỚC khi dispatch team.
 
-## Context Snapshot (đọc trước)
+## Context (compile-once)
 
-$snap_md
+Read **`@$snap_rel`** — Context Snapshot (FRESH/STALE inside). Skip `wf_step_context()` when **FRESH**.
 
 ### When fresher than snapshot / codebase
 \`\`\`
@@ -219,6 +297,9 @@ _war_room_spawn_board() {
   echo -e "  │ @.cursor/agents/tech-lead-agent.md                        "
   echo -e "  │ @${wr_dir#$REPO_ROOT/}/tech-lead-assessment-brief.md     "
   echo -e "  └────────────────────────────────────────────────────────────┘"
+  echo ""
+  echo -e "  ${CYAN}Orchestration:${NC} Prefer **Mode B** (Task subagents) — isolated context per role."
+  echo -e "  Use Mode A tabs only for short clarifications (< 3 tool calls)."
   echo ""
 }
 

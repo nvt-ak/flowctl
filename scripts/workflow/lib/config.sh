@@ -190,24 +190,41 @@ flowctl_ensure_data_dirs() {
   # were initialized before the home-dir layout was introduced — without forcing
   # users to re-run `flowctl init`.
   if [[ -f "$STATE_FILE" && -n "$_fl_id" && ! -f "$FLOWCTL_DATA_DIR/meta.json" ]]; then
-    python3 -c "
-import json, datetime
+    WF_STATE_FILE="$STATE_FILE" WF_DATA_DIR="$FLOWCTL_DATA_DIR" WF_FL_ID="$_fl_id" \
+    WF_FL_NAME="$_fl_name" WF_ROOT="$PROJECT_ROOT" WF_CACHE="$FLOWCTL_CACHE_DIR" \
+    WF_RUNTIME="$FLOWCTL_RUNTIME_DIR" \
+    python3 - <<'PY' 2>/dev/null || true
+import json
+import datetime
+import os
 from pathlib import Path
+
 try:
-    s = json.loads(Path('$STATE_FILE').read_text())
+    state_file = Path(os.environ["WF_STATE_FILE"])
+    data_dir = Path(os.environ["WF_DATA_DIR"])
+    root = Path(os.environ["WF_ROOT"]).resolve()
+    s = json.loads(state_file.read_text(encoding="utf-8"))
     m = {
-        'project_id':   s.get('flow_id',      '$_fl_id'),
-        'project_name': s.get('project_name', '$_fl_name'),
-        'path':         '$PROJECT_ROOT',
-        'cache_dir':    '$FLOWCTL_CACHE_DIR',
-        'runtime_dir':  '$FLOWCTL_RUNTIME_DIR',
-        'created_at':   datetime.datetime.now().isoformat(),
-        'last_seen':    datetime.datetime.now().isoformat(),
+        "project_id": s.get("flow_id", os.environ.get("WF_FL_ID", "")),
+        "project_name": s.get("project_name", os.environ.get("WF_FL_NAME", "")),
+        "path": str(root),
+        "cache_dir": os.environ.get("WF_CACHE", ""),
+        "runtime_dir": os.environ.get("WF_RUNTIME", ""),
+        "created_at": datetime.datetime.now().isoformat(),
+        "last_seen": datetime.datetime.now().isoformat(),
     }
-    Path('$FLOWCTL_DATA_DIR/meta.json').write_text(json.dumps(m, indent=2))
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "meta.json").write_text(json.dumps(m, indent=2), encoding="utf-8")
 except Exception:
-    pass  # Never block a command because meta.json couldn't be written
-" 2>/dev/null || true
+    pass
+PY
+  fi
+
+  # Optional: migrate legacy repo-local events into home cache (split-brain recovery)
+  local _legacy_events="$REPO_ROOT/.cache/mcp/events.jsonl"
+  if [[ -f "$_legacy_events" && ! -s "$FLOWCTL_EVENTS_F" ]]; then
+    mkdir -p "$(dirname "$FLOWCTL_EVENTS_F")"
+    cat "$_legacy_events" >> "$FLOWCTL_EVENTS_F" 2>/dev/null || true
   fi
 }
 

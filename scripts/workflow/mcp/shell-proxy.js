@@ -93,6 +93,10 @@ function resolveProjectCacheDir() {
 const CACHE      = resolveProjectCacheDir();
 const EVENTS_F   = resolve(process.env.FLOWCTL_EVENTS_F    || join(CACHE, 'events.jsonl'));
 const STATS_F    = resolve(process.env.FLOWCTL_STATS_F     || join(CACHE, 'session-stats.json'));
+
+// Diagnostic: split-brain cache (MCP vs CLI) — stderr only, does not affect MCP protocol on stdout
+console.error(`[shell-proxy] cache dir: ${CACHE}`);
+console.error(`[shell-proxy] events file: ${EVENTS_F}`);
 const GEN_FILE   = join(CACHE, '_gen.json');
 const BASELINE_F = join(CACHE, '_baselines.json');
 

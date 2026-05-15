@@ -63,7 +63,8 @@ cmd_cursor_dispatch() {
 
   wf_mcp_health_check
 
-  local thr="${WF_WAR_ROOM_THRESHOLD:-4}"
+  local thr
+  thr=$(wf_war_room_threshold)
   local force_wr="$force_war_room"
   [[ "${WF_FORCE_WAR_ROOM:-0}" == "1" ]] && force_wr="true"
 
@@ -79,19 +80,23 @@ cmd_cursor_dispatch() {
   if [[ "$skip_war_room" == "false" ]]; then
     local score
     score=$(wf_complexity_score "$step")
+    local wr_dir="$DISPATCH_BASE/step-$step/war-room"
+    wf_ensure_dir "$wr_dir"
     if [[ "$force_wr" == "true" ]] || [[ "$score" -ge "$thr" ]]; then
-      echo -e "${MAGENTA}${BOLD}[cursor-dispatch]${NC} Complexity=$score/5 (threshold=$thr${force_wr:+; force-war-room}) → War Room trước khi dispatch team\n"
-      cmd_war_room
-      wf_dispatch_count_bump "$step"
-      echo -e "${YELLOW}⏸  Chờ War Room hoàn thành, sau đó:${NC}"
-      echo -e "  ${BOLD}flowctl cursor-dispatch --merge${NC} (merge war room outputs)"
-      echo -e "  ${BOLD}flowctl cursor-dispatch --skip-war-room${NC} (bỏ qua, dispatch thẳng)\n"
-      return 0
+      if [[ "$force_wr" != "true" ]] && _wf_war_room_outputs_fresh "$wr_dir"; then
+        echo -e "${GREEN}[cursor-dispatch]${NC} Complexity=$score/5 — War Room outputs still valid, reusing.\n"
+        _wf_war_room_ensure_digest "$step" "$(wf_get_step_name "$step")" "$wr_dir"
+      else
+        echo -e "${MAGENTA}${BOLD}[cursor-dispatch]${NC} Complexity=$score/5 (threshold=$thr${force_wr:+; force-war-room}) → War Room trước khi dispatch team\n"
+        cmd_war_room
+        wf_dispatch_count_bump "$step"
+        echo -e "${YELLOW}⏸  Chờ War Room hoàn thành, sau đó:${NC}"
+        echo -e "  ${BOLD}flowctl cursor-dispatch --merge${NC} (merge war room outputs)"
+        echo -e "  ${BOLD}flowctl cursor-dispatch --skip-war-room${NC} (bỏ qua, dispatch thẳng)\n"
+        return 0
+      fi
     else
       echo -e "${GREEN}[cursor-dispatch]${NC} Complexity=$score/5 (< $thr) → Skip War Room, dispatch ngay\n"
-      # Still generate a simple context digest
-      local wr_dir="$DISPATCH_BASE/step-$step/war-room"
-      wf_ensure_dir "$wr_dir"
       _war_room_generate_digest "$step" "$(wf_get_step_name "$step")" "$wr_dir" "simple"
     fi
   fi
@@ -146,8 +151,34 @@ _cursor_spawn_board() {
   fi
   echo ""
 
-  # ── MODE A: Cursor 3 Agent Tabs ──
-  echo -e "${YELLOW}${BOLD}▶ MODE A — Cursor Agent Tabs (Cmd+Shift+I)${NC}"
+  # ── MODE B (default) ──
+  echo -e "${GREEN}${BOLD}▶ MODE B — Task subagents (DEFAULT — use for step work)${NC}"
+  echo -e "  ${CYAN}Prefer Mode B${NC} for any task needing more than ~3 tool calls — clean context per role."
+  echo -e "  PM orchestrator: spawn one Task per role below (${BOLD}is_background: true${NC} when parallel)."
+  echo ""
+  python3 -c "
+import json, os
+roles = json.loads('$roles_json')
+dispatch_dir = '$dispatch_dir'
+step = '$step'
+repo_root = '$REPO_ROOT'
+
+for role in roles:
+    brief_path = os.path.join(dispatch_dir, f'{role}-brief.md').replace(repo_root + '/', '')
+    report_abs  = os.path.join(dispatch_dir, 'reports', f'{role}-report.md')
+    report_rel  = report_abs.replace(repo_root + '/', '')
+    reports_dir = os.path.join(dispatch_dir, 'reports')
+    print(f'  Spawn @{role}:')
+    print(f'    subagent_type: {role}')
+    print(f'    description: Execute step-{step} as @{role}')
+    print(f'    instructions: Read @{brief_path}; load agent skills-to-load.compact only.')
+    print(f'      Write report: {report_abs}')
+    print(f'      mkdir -p {reports_dir} if needed')
+    print()
+"
+
+  # ── MODE A: Cursor Agent Tabs (short tasks only) ──
+  echo -e "${YELLOW}${BOLD}▶ MODE A — Cursor Agent Tabs (short clarifications only)${NC}"
   echo ""
 
   local idx=1
@@ -180,31 +211,6 @@ for role in roles:
     idx=$((idx + 1))
   done
 
-  # ── MODE B: Task Tool ──
-  echo -e "${YELLOW}${BOLD}▶ MODE B — Task Tool Subagents (PM agent tự spawn)${NC}"
-  echo ""
-  python3 -c "
-import json, os
-roles = json.loads('$roles_json')
-dispatch_dir = '$dispatch_dir'
-step = '$step'
-repo_root = '$REPO_ROOT'
-
-for role in roles:
-    brief_path = os.path.join(dispatch_dir, f'{role}-brief.md').replace(repo_root + '/', '')
-    report_abs  = os.path.join(dispatch_dir, 'reports', f'{role}-report.md')
-    report_rel  = os.path.join(dispatch_dir, 'reports', f'{role}-report.md').replace(repo_root + '/', '')
-    reports_dir = os.path.join(dispatch_dir, 'reports')
-    print(f'  Spawn @{role}:')
-    print(f'    subagent_type: {role}')
-    print(f'    description: Execute step-{step} tasks as @{role}')
-    print(f'    instructions: Read @{brief_path} then execute.')
-    print(f'      Write report to ABSOLUTE path: {report_abs}')
-    print(f'      (relative from project root: {report_rel})')
-    print(f'      Run first if dir missing: mkdir -p {reports_dir}')
-    print()
-"
-
   if [[ "$STATE_FILE" == *"/.flowctl/flows/"* ]]; then
     echo -e "${YELLOW}Multi-flow state:${NC} trước khi chạy ${BOLD}flowctl${NC} trong terminal, export:"
     echo -e "  ${BOLD}export FLOWCTL_STATE_FILE=\"$STATE_FILE\"${NC}"
@@ -222,6 +228,7 @@ for role in roles:
   {
     echo "CURSOR SPAWN BOARD — Step $step: $step_name"
     echo "Generated: $(date '+%Y-%m-%d %H:%M:%S')"
+    echo "DEFAULT_ORCHESTRATION: Mode B (Task subagents) — use Mode A only for <3 tool calls"
     echo "Roles: $(python3 -c "import json; print(', '.join(json.loads('$roles_json')))")"
     echo "Context digest: $has_digest"
     if [[ "$STATE_FILE" == *"/.flowctl/flows/"* ]]; then

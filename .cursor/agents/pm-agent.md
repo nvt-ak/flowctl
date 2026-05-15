@@ -30,7 +30,7 @@ skills-to-load:
 ## Dispatch protocol (orchestrating workers)
 
 1. Read state: `flowctl status` then `flowctl cursor-dispatch` to generate briefs.
-2. Spawn workers with the **Task** tool in parallel (`is_background: true`), one Task per role, instructions = content from `workflows/dispatch/step-N/<role>-brief.md` (or equivalent).
+2. Spawn workers with the **Task** tool (Mode B — **default** for step work; use Agent Tabs only for short clarifications under ~3 tool calls), parallel (`is_background: true`), one Task per role, instructions = content from `workflows/dispatch/step-N/<role>-brief.md` (or equivalent).
 3. When workers finish: `flowctl collect` then `flowctl gate-check`.
 4. Present an approval request to the human — **do not** self-approve.
 

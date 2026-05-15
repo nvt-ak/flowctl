@@ -1,155 +1,56 @@
 ---
-description: Universal workflow invariants, quality gates, step execution, approvals, and communication
+description: Universal workflow invariants — always on (slim). Full detail in core-rules-full.mdc
 alwaysApply: true
 ---
 
-# Core Rules — All Agents
+# Core Rules (slim) — All Agents
 
-Version: 4.0.0 | Updated: 2026-05-13 | Applies to: all agents
+Version: 4.1.0 | Updated: 2026-05-15 | **Always applied**
 
-## 1. Absolute constraints (NEVER)
+> Detail (step gates, security tables, retention): load `@.cursor/rules/core-rules-full.mdc` or `@.cursor/rules/step-quality-gates.mdc` for code work.
 
-- Skip or reorder workflow steps; start a step without explicit human `flowctl approve` of the previous step
-- Commit directly to `main` or `master`; self-approve (`flowctl approve` as agent); change scope without PM approval
-- Expose secrets, API keys, or credentials in code, logs, or error messages
+## NEVER
 
-## 2. Evidence requirements
+- Skip/reorder steps or start a step without human `flowctl approve` of the prior step
+- Commit to `main`/`master`; self-approve as agent; change scope without PM approval
+- Expose secrets, API keys, or credentials in code, logs, or errors
 
-Every DELIVERABLE claim in a report MUST include verifiable evidence:
+## Evidence (required for approval)
 
 ```
-DELIVERABLE: path/to/file.ts — short description
-EVIDENCE: file_exists
-
-DELIVERABLE: API /users endpoint
-EVIDENCE: test_output — 12 tests passed (0 failed)
-
-DELIVERABLE: Design mockup
-EVIDENCE: figma_url — https://figma.com/...
+DELIVERABLE: path/to/file — description
+EVIDENCE: file_exists | test_output | figma_url | …
 ```
 
-Rules:
+- Path claims → `flowctl collect` verifies on disk; missing = **UNVERIFIED**
+- PM must not approve with UNVERIFIED deliverables
 
-- File path deliverable → `flowctl collect` auto-verifies existence. Missing file = UNVERIFIED
-- Non-file deliverable → MUST have `EVIDENCE:` with proof (tests, URL, commit hash)
-- Missing or UNVERIFIED evidence → PM MUST NOT approve the step
+## Definition of done (before approval request)
 
-## 3. Code quality gates (before merge)
+- [ ] Deliverables + evidence complete
+- [ ] Tests pass; `flowctl collect` + `flowctl gate-check` PASS (or documented bypass)
+- [ ] Step summary / review checklist / approval request per templates
 
-| Gate | Threshold |
+## Approval gates (summary)
+
+| Step | Approvers |
 |------|-----------|
-| Lint errors | 0 |
-| TypeScript strict errors | 0 |
-| Test coverage — lines / branches / functions | ≥ 80% / ≥ 75% / ≥ 85% |
-| SAST (Critical / High) | 0 |
-| Dependency CVEs (CVSS ≥ 9.0) | 0 |
-| Secret scan | 0 |
-| Cyclomatic complexity | ≤ 10 per function |
-| Function length | ≤ 50 lines |
-
-Naming: files kebab-case; classes PascalCase; functions camelCase; DB snake_case; env UPPER_SNAKE_CASE.
-
-## 4. Security & performance (summary)
-
-- Authentication on endpoints (public exceptions explicit); authorization at service layer, not only controller
-- Validate all user input at API boundary and again for business rules; parameterized queries only
-- Secrets in env / secret manager; rotation plan; different values per environment; no PII in logs (mask)
-- PII at rest encrypted; retention policy; GDPR if EU users
-- API latency: monitor p50/p95/p99; product may define stricter SLOs. No N+1; paginate list endpoints (default 20, max 100); connection pooling
-- Frontend: meet Core Web Vitals targets in product requirements (baseline: LCP under 2.5s, INP under 200ms, CLS under 0.1)
-
-## 5. Step entry (before starting any step)
-
-- [ ] Previous step has valid approval (except Step 1)
-- [ ] Prior blockers resolved or formally accepted by PM
-- [ ] `flowctl-state.json` reflects prior approval
-- [ ] Prior-step artifacts committed
-- [ ] Required agents notified
-
-## 6. Definition of done (before requesting approval)
-
-- [ ] Deliverables complete with evidence (Section 2)
-- [ ] Relevant tests pass; docs updated
-- [ ] `flowctl collect` succeeded; `flowctl gate-check` passes (or formal PM bypass documented)
-- [ ] Changes committed with conventional commits
-- [ ] Step summary → `templates/step-summary-template.md`
-- [ ] Review checklist → `templates/review-checklist-template.md`
-- [ ] Approval request → `templates/approval-request-template.md`
-
-## 7. Blockers, scope, parallel work
-
-**Blockers:** detect → report + `flowctl add-blocker` within 2h → owner → workaround if possible → `flowctl resolve-blocker`. Escalation: CRITICAL under 1h | HIGH same day | MEDIUM under 2 days.
-
-**Scope:** Minor (under 2h) Tech Lead | Moderate (2–8h) PM + Tech Lead | Major (over 8h) change request + PM + stakeholders. **Scope freeze** from Step 7: only P1/P2 critical fixes; PM veto on non-critical.
-
-**Parallel streams** (PM + Tech Lead approval): e.g. 2+3 only with API contracts; 4+5 only with approved OpenAPI; QA prep + Step 6 with Tech Lead sign-off. Clear contracts; integration checkpoints ≥ 2×/week; Tech Lead resolves cross-stream conflicts.
-
-## 8. Step-specific constraints
-
-| Step | Key constraint |
-|------|----------------|
-| 1 | No design/code before requirements; AC in Given/When/Then |
-| 2 | Security threat model; DB schema approved before Step 4 |
-| 3 | WCAG 2.1 AA; mobile + desktop approved together |
-| 4 | Follow approved OpenAPI; no SAST-failing merges |
-| 5 | No UI without approved design; a11y before completion |
-| 6 | Contract tests before integration tests; error paths tested |
-| 7 | No skipped tests without N/A; Critical+High bugs closed before Go/No-Go |
-| 8 | Staging stable ≥ 24h; rollback tested before prod |
-| 9 | Stakeholder demo; release notes PM-approved; post-release monitoring |
-
-## 9. Emergency procedures
-
-**Production hotfix during active flowctl:** PM decides within 1h to suspend or not → branch `hotfix/{issue}-{desc}` from `main` → DevOps + Tech Lead + devs → expedited QA (2–4h) → merge to `main` and `develop` → resume flowctl.
-
-**Rollback to prior step:** PM formal approval + reason → `flowctl rollback --to step:{N}` or manual state → notify all agents with impact → re-plan timeline.
-
-## 10. Approval gates
-
-| Step | Required approvers |
-|------|-------------------|
-| 1 | PM + 1 stakeholder |
+| 1 | PM + stakeholder |
 | 2 | Tech Lead + PM |
 | 3 | UI/UX + PM |
-| 4 | Tech Lead |
-| 5 | Tech Lead + UI/UX |
-| 6 | Tech Lead |
+| 4–6 | Tech Lead (+ UI/UX step 5) |
 | 7 | QA + PM |
 | 8 | DevOps + Tech Lead + PM |
 | 9 | PM + Tech Lead + stakeholder |
 
-**PM pre-approval:** `flowctl release-dashboard --no-write` → `approval_ready: yes`, `breaker_state: closed` → `flowctl gate-check` PASS (or documented bypass) → `flowctl approve --by "Name"`.
+Human only: `flowctl approve --by "Name"` — agents never approve.
 
-Statuses: APPROVED | APPROVED WITH CONDITIONS (fix within 48h) | REJECTED | DEFERRED (24h info). Timeout: 24h reminder → 48h escalate → 72h PM decision.
+## Context snapshot (token)
 
-## 11. Communication & escalation
+- Brief **FRESH** snapshot → start work; do **not** call `wf_step_context()`
+- **STALE** or after `flowctl` state change → `wf_state()` or `wf_step_context()`
+- After `flow_add_blocker` / new decision → treat snapshot as stale
 
-```
-[AGENT] → [TARGET/ALL]
-Priority: CRITICAL | HIGH | MEDIUM | LOW
-Subject: …
-Body: …
-Action required: … / None
-```
+## Blockers (short)
 
-Tags: `@pm` `@tech-lead` `@backend` `@frontend` `@ui-ux` `@devops` `@qa` — SLAs: CRITICAL under 1h | HIGH under 8h | MEDIUM under 2d | LOW per sprint.
-
-| Issue | Primary | Escalate to |
-|-------|---------|-------------|
-| Architecture | Tech Lead | CTO |
-| Product | PM | Product Owner |
-| Security | DevOps | Security team |
-| Performance | Backend | Tech Lead |
-| Design | UI/UX | PM + Tech Lead |
-| Quality gates | QA | Tech Lead + PM |
-
-## 12. Document retention
-
-| Type | Location | Retention |
-|------|----------|-----------|
-| Step summaries | `docs/summaries/` | Permanent |
-| Approvals / reviews | `docs/approvals/`, `docs/reviews/` | Permanent |
-| ADRs | `docs/adr/` | Permanent |
-| Security reports | secure storage | Permanent |
-| Performance reports | `docs/performance/` | 6 months |
-| Bugs | issue tracker | per project |
+Report → `flowctl add-blocker` within 2h; CRITICAL < 1h | HIGH same day | MEDIUM < 2d.

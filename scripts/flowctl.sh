@@ -82,6 +82,8 @@ source "$LIB_DIR/orchestration.sh"
 # shellcheck source=/dev/null
 source "$LIB_DIR/reporting.sh"
 # shellcheck source=/dev/null
+source "$LIB_DIR/plan.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/flow_cli.sh"
 
 # shellcheck source=/dev/null
@@ -360,6 +362,12 @@ SETUP
     exit 1
   fi
 
+  # Align MCP cache with CLI (~/.flowctl/projects/.../cache); dispatcher skips ensure_data_dirs for mcp.
+  flowctl_refresh_runtime_paths
+  flowctl_ensure_data_dirs
+  export FLOWCTL_PROJECT_ROOT="$PROJECT_ROOT"
+  export FLOWCTL_CACHE_DIR FLOWCTL_EVENTS_F FLOWCTL_STATS_F
+
   exec node "$target"
 }
 
@@ -369,6 +377,15 @@ cmd_audit_tokens() {
     wf_error "Không tìm thấy token audit script: $audit_script"
     exit 1
   fi
+
+  flowctl_refresh_runtime_paths
+
+  if [[ ! -f "$FLOWCTL_EVENTS_F" ]]; then
+    wf_warn "events.jsonl không tồn tại: $FLOWCTL_EVENTS_F"
+    wf_info "MCP shell-proxy chưa ghi events. Kiểm tra Cursor MCP (shell-proxy) đang chạy."
+    wf_info "Cache dir: $FLOWCTL_CACHE_DIR"
+  fi
+
   python3 "$audit_script" "$@"
 }
 
@@ -851,6 +868,15 @@ cmd_approve() {
   wf_json_set "steps.$step.completed_at" "$(wf_now)"
   wf_json_set "steps.$step.approved_at" "$(wf_now)"
   wf_json_set "steps.$step.approved_by" "$by"
+  _wf_war_room_invalidate_step "$step"
+
+  if [[ "$step" == "1" ]]; then
+    local plan_file=""
+    plan_file="$(_generate_plan_md 2>/dev/null)" || true
+    if [[ -n "$plan_file" && -f "$plan_file" ]]; then
+      wf_info "Plan MD: ${plan_file#$REPO_ROOT/} (regenerate: ${WORKFLOW_CLI_CMD} generate-plan)"
+    fi
+  fi
 
   # Advance to next step — skip over any skipped steps
   local next_step=$((step + 1))
@@ -1062,6 +1088,9 @@ else:
   fi
 
   bash "$WORKFLOW_ROOT/scripts/hooks/invalidate-cache.sh" state 2>/dev/null || true
+  for s in $steps_list; do
+    _wf_war_room_invalidate_step "$s"
+  done
 
   echo -e "\n${YELLOW}${BOLD}⊘ Steps đã được skip:${NC}"
   for name in "${skipped_names[@]}"; do
@@ -1110,6 +1139,7 @@ cmd_unskip() {
   fi
 
   bash "$WORKFLOW_ROOT/scripts/hooks/invalidate-cache.sh" state 2>/dev/null || true
+  _wf_war_room_invalidate_step "$step_arg"
 
   echo -e "\n${GREEN}✓ Step $step_arg — $step_name: UNSKIPPED (pending)${NC}"
   [[ -n "$reason" ]] && echo -e "  Lý do unskip: $reason"
@@ -1162,11 +1192,14 @@ for n in range(1, 10):
 "
 
   echo -e "\n${CYAN}Presets có sẵn:${NC}"
-  echo -e "  --preset hotfix       → skip steps 2,3,5,6"
-  echo -e "  --preset api-only     → skip steps 3,5"
+  echo -e "  --preset hotfix        → skip steps 2,3,5,6"
+  echo -e "  --preset api-only      → skip steps 3,5"
+  echo -e "  --preset backend-api   → skip steps 3,5"
+  echo -e "  --preset frontend-only → skip steps 2,4,6,8"
   echo -e "  --preset design-sprint → skip steps 4,5,6,7,8,9"
-  echo -e "  --preset research     → skip steps 3,4,5,6,7,8,9"
-  echo -e "  --preset devops-only  → skip steps 1,2,3,4,5,6,7"
+  echo -e "  --preset research      → skip steps 3,4,5,6,7,8,9"
+  echo -e "  --preset devops-only   → skip steps 1,2,3,4,5,6,7"
+  echo -e "  --preset qa-only       → skip steps 1,2,3,4,5,6,8"
   echo -e "\n${CYAN}Lệnh skip:${NC}"
   echo -e "  ${WORKFLOW_CLI_CMD} skip --preset hotfix"
   echo -e "  ${WORKFLOW_CLI_CMD} skip --steps 3,5 --type api-only --reason \"REST API endpoint only\""
@@ -1208,6 +1241,7 @@ with open('$STATE_FILE', encoding='utf-8') as f: d = json.load(f)
 d['metrics']['total_blockers'] = d['metrics'].get('total_blockers', 0) + 1
 with open('$STATE_FILE', 'w', encoding='utf-8') as f: json.dump(d, f, indent=2, ensure_ascii=False)
 "
+  _wf_war_room_invalidate_step "$step"
 
   echo -e "\n${YELLOW}Blocker đã được ghi nhận: [$id] $desc${NC}"
   echo -e "Resolve: ${BOLD}${WORKFLOW_CLI_CMD} blocker resolve $id${NC}\n"
@@ -1345,6 +1379,7 @@ with open('$STATE_FILE', encoding='utf-8') as f: d = json.load(f)
 d['metrics']['total_decisions'] = d['metrics'].get('total_decisions', 0) + 1
 with open('$STATE_FILE', 'w', encoding='utf-8') as f: json.dump(d, f, indent=2, ensure_ascii=False)
 "
+  _wf_war_room_invalidate_step "$step"
 
   echo -e "${GREEN}Quyết định đã được ghi nhận: [$id]${NC}\n"
 }
@@ -1533,18 +1568,25 @@ case "$CMD" in
     cmd_mercenary "$SUBCMD" "$@"
     ;;
   monitor|mon)
+    flowctl_refresh_runtime_paths
+    export FLOWCTL_PROJECT_ROOT="$PROJECT_ROOT"
+    export FLOWCTL_CACHE_DIR FLOWCTL_EVENTS_F FLOWCTL_STATS_F
     # Pass project root so monitor-web.py resolves REPO correctly for global installs
     # Auto --global if not inside a project dir and not already specified
     if [[ ! -f "$STATE_FILE" && "${1:-}" != "--once" && "${1:-}" != "--global" ]]; then
-      FLOWCTL_PROJECT_ROOT="$PROJECT_ROOT" python3 "$WORKFLOW_ROOT/scripts/monitor-web.py" --global "$@"
+      python3 "$WORKFLOW_ROOT/scripts/monitor-web.py" --global "$@"
     else
-      FLOWCTL_PROJECT_ROOT="$PROJECT_ROOT" python3 "$WORKFLOW_ROOT/scripts/monitor-web.py" "$@"
+      python3 "$WORKFLOW_ROOT/scripts/monitor-web.py" "$@"
     fi
     ;;
   retro)        cmd_retro "$@" ;;
   skip)         cmd_skip "$@" ;;
   unskip)       cmd_unskip "$@" ;;
   assess)       cmd_assess ;;
+  generate-plan|generate_plan|plan-md)
+    cmd_generate_plan "$@" ;;
+  plan)
+    cmd_plan "$@" ;;
   complexity)   cmd_complexity ;;
   mcp)          cmd_mcp "$@" ;;
   hook)
@@ -1616,6 +1658,7 @@ PY
     echo -e "  retro [step]           Post-approve: extract lessons → .graphify/lessons.json"
     echo -e "  gate-check             Kiểm tra QA gate cho step hiện tại"
     echo -e "  assess                 PM workflow assessment — xem steps + gợi ý skip"
+    echo -e "  generate-plan | plan   Tạo/cập nhật workflows/.../plans/plan.md từ state"
     echo -e "  skip --steps N[,M] [--preset name] [--type T] [--reason \"...\"]"
     echo -e "                         Skip steps không cần thiết cho task này"
     echo -e "  unskip --step N [--reason \"...\"]"
