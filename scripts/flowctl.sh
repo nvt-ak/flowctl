@@ -1349,6 +1349,130 @@ with open('$STATE_FILE', 'w', encoding='utf-8') as f: json.dump(d, f, indent=2, 
   echo -e "${GREEN}Quyết định đã được ghi nhận: [$id]${NC}\n"
 }
 
+cmd_fork() {
+  # Create an isolated flow for the current shell session and print an eval-able
+  # export line so the caller can apply it without a subshell.
+  #
+  # Usage (in your terminal):
+  #   eval "$(flowctl fork)"
+  #   eval "$(flowctl fork --label auth-feature)"
+  #
+  # After eval, FLOWCTL_ACTIVE_FLOW is set in this shell only.
+  # Other windows keep their own FLOWCTL_ACTIVE_FLOW — no shared lock.
+  #
+  # NOTE: fork does NOT call wf_acquire_flow_lock — it creates a brand-new
+  # state file that has no existing lock to compete with.
+
+  local label="" proj_name=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --label|-l) label="${2:-}"; shift 2 ;;
+      --project)  proj_name="${2:-}"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+
+  # Default label = timestamp so parallel forks are distinguishable
+  [[ -z "$label" ]] && label="task-$(date +%H%M)"
+
+  # Inherit project name from current active flow or folder name
+  if [[ -z "$proj_name" && -f "$STATE_FILE" ]]; then
+    proj_name="$(python3 -c "
+import json,sys
+try: print(json.load(open('$STATE_FILE',encoding='utf-8')).get('project_name','') or '')
+except: print('')
+" 2>/dev/null || true)"
+  fi
+  [[ -z "$proj_name" ]] && proj_name="$(basename "$REPO_ROOT")"
+
+  local template_state="$WORKFLOW_ROOT/templates/flowctl-state.template.json"
+  if [[ ! -f "$template_state" ]]; then
+    echo "# [flowctl fork] ERROR: template not found: $template_state" >&2
+    exit 1
+  fi
+
+  local flows_json="$REPO_ROOT/.flowctl/flows.json"
+
+  # Generate new flow_id + short hash
+  local out_json
+  out_json="$(
+    WF_TEMPLATE="$template_state" \
+    WF_LABEL="$label" \
+    WF_PROJECT_NAME="$proj_name" \
+    python3 - <<'PY'
+import json, os, uuid, datetime
+from pathlib import Path
+tpl   = Path(os.environ["WF_TEMPLATE"])
+proj  = os.environ.get("WF_PROJECT_NAME", "Project").strip() or "Project"
+label = os.environ.get("WF_LABEL", "").strip()
+flow_id = f"wf-{uuid.uuid4()}"
+short   = str(uuid.uuid4()).replace("-", "")[:8]
+data = json.loads(tpl.read_text(encoding="utf-8"))
+data["flow_id"]        = flow_id
+data["project_name"]   = proj
+data["overall_status"] = "in_progress"
+data["current_step"]   = 1
+if label:
+    data["project_description"] = label
+now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+data["created_at"] = data["updated_at"] = now
+print(json.dumps({"flow_id": flow_id, "short": short, "state": data}, ensure_ascii=False))
+PY
+  )" || { echo "# [flowctl fork] ERROR: failed to scaffold state" >&2; exit 1; }
+
+  local fid short rel dest
+  fid="$(echo "$out_json"   | python3 -c "import json,sys;print(json.load(sys.stdin)['flow_id'])")"
+  short="$(echo "$out_json" | python3 -c "import json,sys;print(json.load(sys.stdin)['short'])")"
+  rel=".flowctl/flows/$short/state.json"
+  dest="$REPO_ROOT/$rel"
+  mkdir -p "$(dirname "$dest")"
+
+  # Write state file
+  echo "$out_json" | python3 -c "
+import json,sys
+d = json.load(sys.stdin)['state']
+json.dump(d, open(sys.argv[1],'w',encoding='utf-8'), indent=2, ensure_ascii=False)
+" "$dest" || { echo "# [flowctl fork] ERROR: could not write $dest" >&2; exit 1; }
+
+  # Register in flows.json — but do NOT change active_flow_id
+  # (the global default stays untouched; only this shell's env var changes)
+  local _flock_dir="$REPO_ROOT/.flowctl/flows.new.lock"
+  mkdir "$_flock_dir" 2>/dev/null || true
+  if [[ ! -f "$flows_json" ]]; then
+    WF_FLOWS_JSON="$flows_json" WF_FID="$fid" WF_REL="$rel" WF_LABEL="$label" \
+    python3 - <<'PY'
+import json, os
+from pathlib import Path
+p = Path(os.environ["WF_FLOWS_JSON"])
+fid = os.environ["WF_FID"]; rel = os.environ["WF_REL"]; label = os.environ.get("WF_LABEL","")
+# First flow ever — set as active so the project is usable without env var too
+idx = {"version": 1, "active_flow_id": fid, "flows": {fid: {"state_file": rel, "label": label}}}
+p.parent.mkdir(parents=True, exist_ok=True)
+p.write_text(json.dumps(idx, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+PY
+  else
+    WF_FLOWS_JSON="$flows_json" WF_FID="$fid" WF_REL="$rel" WF_LABEL="$label" \
+    python3 - <<'PY'
+import json, os
+from pathlib import Path
+p = Path(os.environ["WF_FLOWS_JSON"])
+fid = os.environ["WF_FID"]; rel = os.environ["WF_REL"]; label = os.environ.get("WF_LABEL","")
+idx = json.loads(p.read_text(encoding="utf-8"))
+idx.setdefault("flows", {})[fid] = {"state_file": rel, "label": label}
+# Do NOT touch active_flow_id — each shell sets its own via env var
+p.write_text(json.dumps(idx, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+PY
+  fi
+  rm -rf "$_flock_dir" 2>/dev/null || true
+
+  # ── Stdout: eval-able export (this is what the shell captures) ──
+  echo "export FLOWCTL_ACTIVE_FLOW=$fid"
+  # ── Stderr: human-readable confirmation ──
+  echo -e "${GREEN}[flowctl fork]${NC} Flow '$label' → $rel" >&2
+  echo -e "${CYAN}[flowctl fork]${NC} Shell isolado. Lệnh tiếp theo dùng flow riêng." >&2
+  echo -e "${CYAN}[flowctl fork]${NC} Xem tất cả flows: flowctl flow list" >&2
+}
+
 # ── Main dispatcher ──────────────────────────────────────────
 CMD="${1:-status}"
 shift || true
@@ -1470,6 +1594,7 @@ PY
   history|h)    cmd_history ;;
   reset)        cmd_reset "$@" ;;
   flow|flows)   cmd_flow "$@" ;;
+  fork)         cmd_fork "$@" ;;
   help|--help|-h)
     echo ""
     wf_info "IT Product Workflow CLI"
@@ -1513,6 +1638,8 @@ PY
     echo -e "  history                Lịch sử approvals"
     echo -e "  reset <step>           Reset về step cụ thể"
     echo -e "  flow list|new|switch  Đa luồng state (.flowctl/flows.json + FLOWCTL_STATE_FILE)"
+    echo -e "  fork [--label <name>]  Tạo flow riêng cho shell này, dùng: eval \"\$(flowctl fork)\""
+    echo -e "                         Sau eval, shell này tự động dùng flow mới, không ảnh hưởng window khác"
     echo ""
     wf_info "Mẹo: bắt đầu nhanh với ${WORKFLOW_CLI_CMD} init --project \"Tên dự án\""
     wf_info "Mẹo: xem trạng thái bất kỳ lúc nào với ${WORKFLOW_CLI_CMD} status"
