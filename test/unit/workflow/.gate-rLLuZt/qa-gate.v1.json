@@ -1,1 +1,0 @@
-{"version":"1.0.0","defaults":{"allowed_step_statuses_for_approve":["in_progress"],"min_worker_reports":1,"min_deliverables":1,"min_decisions":0,"require_no_open_blockers":true,"deny_if_already_approved":true}}

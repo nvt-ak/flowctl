@@ -30,3 +30,4 @@ plan.md
 brainstorm-v2.md
 brainstorm.md
 .cursor/plans/
+test/unit/workflow/.gate-*
