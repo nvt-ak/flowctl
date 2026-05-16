@@ -9,26 +9,24 @@ describe("collectStepRoles", () => {
   });
 
   it("returns primary then support agents, deduped", () => {
-    const state = makeState({
-      steps: {
-        "1": {
-          agent: "pm",
-          support_agents: ["tech-lead", "pm", "tech-lead"],
-        },
-      },
-    });
+    const state = makeState();
+    const step1 = state.steps["1"]!;
+    state.steps["1"] = {
+      ...step1,
+      agent: "pm",
+      support_agents: ["tech-lead", "pm", "tech-lead"],
+    };
     expect(collectStepRoles(state, "1")).toEqual(["pm", "tech-lead"]);
   });
 
   it("omits empty primary and trims roles", () => {
-    const state = makeState({
-      steps: {
-        "2": {
-          agent: "  backend  ",
-          support_agents: ["", "tech-lead"],
-        },
-      },
-    });
+    const state = makeState();
+    const step2 = state.steps["2"]!;
+    state.steps["2"] = {
+      ...step2,
+      agent: "  backend  ",
+      support_agents: ["", "tech-lead"],
+    };
     expect(collectStepRoles(state, "2")).toEqual(["backend", "tech-lead"]);
   });
 });

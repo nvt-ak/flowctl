@@ -29,13 +29,17 @@ describe("commands/monitor", () => {
       await runMonitor(ctx, ["--once"]);
 
       expect(execa).toHaveBeenCalledTimes(1);
-      const [python, argv, opts] = vi.mocked(execa).mock.calls[0]!;
+      const [python, argv, opts] = vi.mocked(execa).mock.calls[0] as unknown as [
+        string,
+        string[],
+        { stdio?: string; env?: Record<string, string> },
+      ];
       expect(python).toBe(process.platform === "win32" ? "python" : "python3");
       expect(String(argv[0])).toContain("monitor-web.py");
       expect(argv).toContain("--once");
-      expect(opts?.stdio).toBe("inherit");
-      expect(opts?.env?.FLOWCTL_PROJECT_ROOT).toBe(repo);
-      expect(opts?.env?.FLOWCTL_CACHE_DIR).toBe(paths.cacheDir);
+      expect(opts.stdio).toBe("inherit");
+      expect(opts.env?.FLOWCTL_PROJECT_ROOT).toBe(repo);
+      expect(opts.env?.FLOWCTL_CACHE_DIR).toBe(paths.cacheDir);
     });
   });
 });

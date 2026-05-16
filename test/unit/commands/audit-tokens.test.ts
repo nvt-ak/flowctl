@@ -1,6 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runAuditTokens } from "@/commands/audit-tokens";
 import * as tokenAudit from "@/integrations/token-audit";

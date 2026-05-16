@@ -31,7 +31,9 @@ describe("commands/budget", () => {
     await makeCtx(async (ctx) => {
       await runBudgetStatus(ctx);
       const raw = await readFile(ctx.paths.budgetStateFile, "utf-8");
-      const parsed = JSON.parse(raw) as { breaker?: { state?: string } };
+      const parsed = JSON.parse(raw) as {
+        breaker?: { state?: string; cooldown_seconds?: number };
+      };
       parsed.breaker = { ...parsed.breaker, state: "open", cooldown_seconds: 120 };
       const { writeFile } = await import("node:fs/promises");
       await writeFile(ctx.paths.budgetStateFile, JSON.stringify(parsed), "utf-8");

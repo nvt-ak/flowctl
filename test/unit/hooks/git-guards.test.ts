@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const mockExecFileSync = vi.hoisted(() => vi.fn(() => "feature/x\n"));
+const mockExecFileSync = vi.hoisted(() =>
+  vi.fn((_command?: unknown, _args?: unknown, _options?: unknown) => "feature/x\n"),
+);
+
+type ExecFileSync = typeof import("node:child_process")["execFileSync"];
 
 vi.mock("node:child_process", () => ({
-  execFileSync: (...args: unknown[]) => mockExecFileSync(...args),
+  execFileSync: ((...args: Parameters<ExecFileSync>) =>
+    mockExecFileSync(...args)) as ExecFileSync,
 }));
 
 import {

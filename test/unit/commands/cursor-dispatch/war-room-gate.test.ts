@@ -33,7 +33,7 @@ describe("cursor-dispatch/war-room-gate", () => {
   it("runs War Room when score meets threshold", async () => {
     const state = defaultState();
     state.current_step = 1;
-    state.steps["1"]!.dispatch_risk = { high_risk: true };
+    state.steps["1"]!.dispatch_risk = { high_risk: true, dispatch_count: 0 };
     const result = await evaluateWarRoomGate(
       state,
       "1",
@@ -69,7 +69,7 @@ describe("cursor-dispatch/war-room-gate", () => {
       if (!read.ok) return;
 
       const state = read.data;
-      state.steps["1"]!.dispatch_risk = { high_risk: true };
+      state.steps["1"]!.dispatch_risk = { high_risk: true, dispatch_count: 0 };
 
       const result = await evaluateWarRoomGate(
         state,

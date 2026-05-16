@@ -43,7 +43,7 @@ describe("reporting integrations", () => {
   it("formatStepSummary formats object deliverables and missing step", () => {
     const state = defaultState();
     state.steps["1"]!.deliverables = [
-      { claim: "api.md", path: "docs/api.md", verified: true },
+      { claim: "api.md", path: "docs/api.md", verified: true, source: "test" },
       "plain-string-deliverable",
     ];
 
@@ -64,7 +64,7 @@ describe("reporting integrations", () => {
     state.steps["2"]!.approval_status = "approved";
     state.steps["2"]!.approved_by = "PM";
     state.steps["2"]!.approved_at = "2026-02-02";
-    delete state.steps["3"]!.approval_status;
+    state.steps["3"]!.approval_status = null;
 
     const out = formatApprovalHistory(state);
     expect(out).toContain("REJECTED");
