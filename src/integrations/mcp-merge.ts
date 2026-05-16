@@ -92,7 +92,8 @@ export function setupTemplate(): Record<string, McpServerEntry> {
       command: flowctlCmd,
       args: ["mcp", "--shell-proxy"],
       env: { FLOWCTL_PROJECT_ROOT: "${workspaceFolder}" },
-      description: "Token-efficient shell proxy — wf_state, wf_git, wf_step_context, wf_files, wf_read, wf_env",
+      description:
+        "Token-efficient shell proxy — wf_state, wf_git, wf_step_context, wf_files, wf_read, wf_env",
     },
   };
 }

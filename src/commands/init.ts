@@ -23,7 +23,7 @@ import {
 import { defaultState } from "@/state/default-state";
 import { readState } from "@/state/reader";
 import { FlowctlStateSchema } from "@/state/schema";
-import { mergeCursorMcp } from "@/lib/mcp-merge";
+import { mergeCursorMcp } from "@/integrations/mcp-merge";
 import { atomicJsonWrite } from "@/utils/json";
 import { pathExists } from "@/utils/fs";
 import { nowTimestamp } from "@/utils/time";
@@ -141,7 +141,7 @@ async function ensureGateTemplates(
   }
 }
 
-/** Copy scaffold assets (partial Phase 3 — MCP merge: TS `mcp-merge.ts` when FLOWCTL_ENGINE=ts, else Python). */
+/** Copy scaffold assets (MCP merge: TS `@/integrations/mcp-merge` when FLOWCTL_ENGINE=ts, else Python). */
 export async function ensureProjectScaffold(
   projectRoot: string,
   workflowRoot: string,

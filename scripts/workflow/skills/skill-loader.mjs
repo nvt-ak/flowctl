@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 import { join } from 'path';
 import { readFileSync } from 'fs';
 import { getProjectRoot, loadIndex, stripFrontmatter, appendUsageLog } from './skill-utils.mjs';

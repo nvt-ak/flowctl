@@ -30,6 +30,7 @@ import { runHistory } from "@/commands/history";
 import { runReleaseDashboard } from "@/commands/release-dashboard";
 import { runInit } from "@/commands/init";
 import { runMcp, type McpCliOptions } from "@/commands/mcp";
+import { runAuditTokens, type AuditTokensCliOptions } from "@/commands/audit-tokens";
 import { runComplexity } from "@/commands/complexity";
 import { runBudgetStatus } from "@/commands/budget";
 import { runWarRoom } from "@/commands/war-room";
@@ -572,7 +573,7 @@ program
 
 program
   .command("summary")
-  .description("Tóm tắt step hiện tại")
+  .description("Summary of current step")
   .alias("sum")
   .action(async () => {
     await runCommand("summary", runSummary);
@@ -580,7 +581,7 @@ program
 
 program
   .command("history")
-  .description("Lịch sử approvals")
+  .description("History of approvals")
   .alias("h")
   .action(async () => {
     await runCommand("history", runHistory);
@@ -603,18 +604,92 @@ program
 
 program
   .command("reset <step>")
-  .description("Reset workflow về step (interactive)")
+  .description("Reset workflow to step (interactive)")
   .option("-y, --yes", "Skip confirmation")
   .action(async (step: string, opts: { yes?: boolean }) => {
     await runCommand("reset", (ctx) => runReset(ctx, step, { yes: opts.yes }));
   });
 
 program
+  .command("audit-tokens")
+  .description("Audit token overhead/work từ MCP events (JSONL)")
+  .option("--days <n>", "Chỉ phân tích N ngày gần nhất", (v) => Number(v))
+  .option("--step <n>", "Lọc theo step", (v) => Number(v))
+  .option("--format <fmt>", "table | markdown | json | legacy", "table")
+  .option("--limit <n>", "Giới hạn số task rows", (v) => Number(v))
+  .option("--json", "Deprecated: tương đương --format json")
+  .option("--skill-sizes", "Line counts compact vs lazy (manifest)")
+  .action(
+    async (opts: {
+      days?: number;
+      step?: number;
+      format?: string;
+      limit?: number;
+      json?: boolean;
+      skillSizes?: boolean;
+    }) => {
+      const fmt = opts.format ?? "table";
+      if (!["table", "markdown", "json", "legacy"].includes(fmt)) {
+        console.error(`Invalid --format: ${fmt}`);
+        process.exitCode = 1;
+        return;
+      }
+      await runCommand("audit-tokens", (ctx) =>
+        runAuditTokens(ctx, {
+          days: opts.days,
+          step: opts.step,
+          format: fmt as AuditTokensCliOptions["format"],
+          limit: opts.limit,
+          json: opts.json === true,
+          skillSizes: opts.skillSizes === true,
+        }),
+      );
+    },
+  );
+
+program
+  .command("audit")
+  .description("Alias của audit-tokens")
+  .option("--days <n>", "Chỉ phân tích N ngày gần nhất", (v) => Number(v))
+  .option("--step <n>", "Lọc theo step", (v) => Number(v))
+  .option("--format <fmt>", "table | markdown | json | legacy", "table")
+  .option("--limit <n>", "Giới hạn số task rows", (v) => Number(v))
+  .option("--json", "Deprecated: tương đương --format json")
+  .option("--skill-sizes", "Line counts compact vs lazy (manifest)")
+  .action(
+    async (opts: {
+      days?: number;
+      step?: number;
+      format?: string;
+      limit?: number;
+      json?: boolean;
+      skillSizes?: boolean;
+    }) => {
+      const fmt = opts.format ?? "table";
+      if (!["table", "markdown", "json", "legacy"].includes(fmt)) {
+        console.error(`Invalid --format: ${fmt}`);
+        process.exitCode = 1;
+        return;
+      }
+      await runCommand("audit-tokens", (ctx) =>
+        runAuditTokens(ctx, {
+          days: opts.days,
+          step: opts.step,
+          format: fmt as AuditTokensCliOptions["format"],
+          limit: opts.limit,
+          json: opts.json === true,
+          skillSizes: opts.skillSizes === true,
+        }),
+      );
+    },
+  );
+
+program
   .command("mcp")
   .description("MCP servers — stdio (--shell-proxy | --workflow-state) hoặc --setup")
   .option("--shell-proxy", "Shell proxy MCP (stdio)")
   .option("--workflow-state", "Workflow state MCP (stdio)")
-  .option("--setup", "In hướng dẫn snippet .cursor/mcp.json")
+  .option("--setup", "Show instructions for .cursor/mcp.json")
   .action(async (opts: McpCliOptions) => {
     try {
       const ctx = await getContext();
@@ -628,10 +703,10 @@ program
 
 program
   .command("init")
-  .description("Khởi tạo project (MCP merge: TS khi FLOWCTL_ENGINE=ts, Python mặc định)")
-  .option("--project <name>", "Tên dự án")
-  .option("--overwrite", "Ghi đè scaffold / reset active flow state")
-  .option("--no-setup", "Bỏ qua setup.sh")
+  .description("Initialize project (MCP merge: TS when FLOWCTL_ENGINE=ts, Python default)")
+  .option("--project <name>", "Project name")
+  .option("--overwrite", "Overwrite scaffold / reset active flow state")
+  .option("--no-setup", "Skip setup.sh")
   .action(async (opts: { project?: string; overwrite?: boolean; noSetup?: boolean }) => {
     try {
       const ctx = await getContext();

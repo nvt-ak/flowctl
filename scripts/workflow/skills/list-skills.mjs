@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 import { getProjectRoot, loadIndex } from './skill-utils.mjs';
 
 const args = process.argv.slice(2);

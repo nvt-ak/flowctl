@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 import { join } from 'path';
 import {
   discoverSkillFiles,
