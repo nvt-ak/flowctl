@@ -34,76 +34,33 @@ export type InitOptions = {
   noSetup?: boolean;
 };
 
-async function runScaffoldMerge(
-  projectRoot: string,
-  workflowRoot: string,
-  overwrite: boolean,
-): Promise<void> {
+async function runScaffoldMerge(projectRoot: string, overwrite: boolean): Promise<void> {
   const mcpPath = join(projectRoot, ".cursor", "mcp.json");
-  if (process.env.FLOWCTL_ENGINE === "ts") {
-    try {
-      const result = await mergeCursorMcp({
-        mcpPath,
-        overwrite,
-        mode: { type: "scaffold", workflowCli: "flowctl" },
-      });
-      if (result.exitCode === 2) {
-        const invalidJson = result.lines.some((l) => l.includes("MCP_STATUS=invalid_json"));
-        console.warn(
-          chalk.yellow(
-            invalidJson
-              ? ".cursor/mcp.json: invalid JSON — fix manually or run init --overwrite"
-              : ".cursor/mcp.json: invalid structure — fix manually or run init --overwrite",
-          ),
-        );
-      }
-    } catch (e: unknown) {
-      const code = (e as NodeJS.ErrnoException)?.code;
-      const msg = e instanceof Error ? e.message : String(e);
-      if (code === "EACCES" || msg.includes("permission denied")) {
-        console.warn(chalk.yellow(".cursor/mcp.json: permission denied — skipped merge"));
-      } else {
-        console.warn(chalk.yellow(`merge MCP: ${msg}`));
-      }
+  try {
+    const result = await mergeCursorMcp({
+      mcpPath,
+      overwrite,
+      mode: { type: "scaffold", workflowCli: "flowctl" },
+    });
+    if (result.exitCode === 2) {
+      const invalidJson = result.lines.some((l) => l.includes("MCP_STATUS=invalid_json"));
+      console.warn(
+        chalk.yellow(
+          invalidJson
+            ? ".cursor/mcp.json: invalid JSON — fix manually or run init --overwrite"
+            : ".cursor/mcp.json: invalid structure — fix manually or run init --overwrite",
+        ),
+      );
     }
-    return;
+  } catch (e: unknown) {
+    const code = (e as NodeJS.ErrnoException)?.code;
+    const msg = e instanceof Error ? e.message : String(e);
+    if (code === "EACCES" || msg.includes("permission denied")) {
+      console.warn(chalk.yellow(".cursor/mcp.json: permission denied — skipped merge"));
+    } else {
+      console.warn(chalk.yellow(`merge MCP: ${msg}`));
+    }
   }
-  const script = join(workflowRoot, "scripts", "merge_cursor_mcp.py");
-  if (!(await pathExists(script))) {
-    console.warn(chalk.yellow(`merge script missing: ${script}`));
-    return;
-  }
-  const pyArgs = overwrite
-    ? [script, "--overwrite", "--scaffold", "flowctl", mcpPath]
-    : [script, "--scaffold", "flowctl", mcpPath];
-  await new Promise<number>((res, rej) => {
-    const ch = spawn("python3", pyArgs, {
-      cwd: projectRoot,
-      env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stderr = "";
-    ch.stderr?.on("data", (d: Buffer) => {
-      stderr += d.toString();
-    });
-    ch.on("error", rej);
-    ch.on("close", (c) => {
-      if (c === 2) {
-        console.warn(
-          chalk.yellow(
-            ".cursor/mcp.json: invalid JSON — fix manually or run init --overwrite",
-          ),
-        );
-      } else if (c !== 0 && stderr.includes("PermissionError")) {
-        console.warn(
-          chalk.yellow(".cursor/mcp.json: permission denied — skipped merge"),
-        );
-      } else if (c !== 0) {
-        console.warn(chalk.yellow(`merge_cursor_mcp.py exited ${c}`));
-      }
-      res(c ?? 1);
-    });
-  });
 }
 
 async function copyScaffoldTree(
@@ -141,7 +98,7 @@ async function ensureGateTemplates(
   }
 }
 
-/** Copy scaffold assets (MCP merge: TS `@/integrations/mcp-merge` when FLOWCTL_ENGINE=ts, else Python). */
+/** Copy scaffold assets (MCP merge: TS `@/integrations/mcp-merge`). */
 export async function ensureProjectScaffold(
   projectRoot: string,
   workflowRoot: string,
@@ -152,7 +109,7 @@ export async function ensureProjectScaffold(
   await mkdir(join(projectRoot, "workflows", "gates"), { recursive: true });
   await mkdir(join(projectRoot, "workflows", "policies"), { recursive: true });
 
-  await runScaffoldMerge(projectRoot, workflowRoot, overwrite);
+  await runScaffoldMerge(projectRoot, overwrite);
 
   const settingsSrc = join(workflowRoot, ".claude", "settings.json");
   const settingsDst = join(projectRoot, ".claude", "settings.json");
@@ -369,7 +326,7 @@ async function maybeRunSetup(
 
 /**
  * Partial `flowctl init` (Phase 3 week 4): flows bootstrap, state finalize, scaffold,
- * optional setup.sh. MCP merge: `merge_cursor_mcp.py` by default; TypeScript `mergeCursorMcp` when FLOWCTL_ENGINE=ts.
+ * optional setup.sh. MCP merge: TypeScript `mergeCursorMcp` (Phase 4).
  */
 export async function runInit(ctx: FlowctlContext, opts: InitOptions = {}): Promise<void> {
   const skipSetup =

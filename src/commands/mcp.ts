@@ -1,9 +1,8 @@
-import { spawn } from "node:child_process";
-import { join } from "node:path";
 import chalk from "chalk";
 import type { FlowctlContext } from "@/cli/context";
 import { ensureDataDirs } from "@/config/paths";
-import { pathExists } from "@/utils/fs";
+import { startShellProxyMcp } from "@/mcp/shell-proxy/index";
+import { startWorkflowStateMcp } from "@/mcp/workflow-state";
 
 export type McpCliOptions = {
   shellProxy?: boolean;
@@ -56,15 +55,6 @@ export async function runMcp(ctx: FlowctlContext, opts: McpCliOptions): Promise<
     return;
   }
 
-  const scriptName =
-    opts.shellProxy === true ? "shell-proxy.js" : "workflow-state.js";
-  const target = join(ctx.workflowRoot, "scripts", "workflow", "mcp", scriptName);
-  if (!(await pathExists(target))) {
-    console.error(chalk.red(`Không tìm thấy MCP script: ${target}`));
-    process.exitCode = 1;
-    return;
-  }
-
   await ensureDataDirs(ctx.paths);
   const env = {
     ...process.env,
@@ -75,12 +65,17 @@ export async function runMcp(ctx: FlowctlContext, opts: McpCliOptions): Promise<
     FLOWCTL_HOME: ctx.paths.flowctlHome,
   };
 
-  await new Promise<void>((resolvePromise, reject) => {
-    const child = spawn("node", [target], { stdio: "inherit", env });
-    child.on("error", reject);
-    child.on("close", (code) => {
-      if (code !== 0 && code !== null) process.exitCode = code ?? 1;
-      resolvePromise();
+  if (opts.shellProxy === true) {
+    await startShellProxyMcp({
+      projectRoot: ctx.projectRoot,
+      env,
+      cacheDir: ctx.paths.cacheDir,
+      eventsFile: ctx.paths.eventsFile,
+      statsFile: ctx.paths.statsFile,
+      ...(ctx.stateFile ? { stateFile: ctx.stateFile } : {}),
     });
-  });
+    return;
+  }
+
+  await startWorkflowStateMcp(ctx.projectRoot, env);
 }
