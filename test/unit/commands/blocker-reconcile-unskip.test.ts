@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FlowctlContext } from "@/cli/context";
 import {
   runBlockerReconcile,
@@ -115,6 +115,102 @@ describe("blocker reconcile + unskip (bash parity)", () => {
     expect(after.steps["1"]!.blockers[0]!.resolution_note).toContain(
       "role-policy covers",
     );
+  });
+
+  it("reconcile leaves blocker open when no rule matches", async () => {
+    const { ctx } = await tmpRepo();
+    const stateFile = ctx.stateFile!;
+    const st = FlowctlStateSchema.parse(
+      JSON.parse(await readFile(stateFile, "utf-8")),
+    );
+    st.steps["1"]!.blockers = [
+      {
+        id: "B-open",
+        description: "Waiting on external vendor sign-off",
+        created_at: "2026-01-01",
+        resolved: false,
+      },
+    ];
+    await writeState(stateFile, st);
+
+    const logs: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((msg: unknown) => {
+      logs.push(String(msg));
+    });
+
+    await runBlockerReconcile(ctx);
+
+    const after = FlowctlStateSchema.parse(
+      JSON.parse(await readFile(stateFile, "utf-8")),
+    );
+    expect(after.steps["1"]!.blockers[0]!.resolved).toBe(false);
+    expect(logs.join("\n")).toContain("OPEN|B-open|");
+    log.mockRestore();
+  });
+
+  it("reconcile resolves when requirements and architecture docs exist", async () => {
+    const { ctx, repo } = await tmpRepo();
+    await mkdir(join(repo, "docs"), { recursive: true });
+    await writeFile(join(repo, "docs", "requirements.md"), "# req\n", "utf-8");
+    await writeFile(join(repo, "docs", "architecture.md"), "# arch\n", "utf-8");
+    const stateFile = ctx.stateFile!;
+    const st = FlowctlStateSchema.parse(
+      JSON.parse(await readFile(stateFile, "utf-8")),
+    );
+    st.steps["1"]!.blockers = [
+      {
+        id: "B-docs",
+        description: "Need docs/requirements.md and docs/architecture.md",
+        created_at: "2026-01-01",
+        resolved: false,
+      },
+    ];
+    await writeState(stateFile, st);
+
+    await runBlockerReconcile(ctx);
+
+    const after = FlowctlStateSchema.parse(
+      JSON.parse(await readFile(stateFile, "utf-8")),
+    );
+    expect(after.steps["1"]!.blockers[0]!.resolved).toBe(true);
+    expect(after.steps["1"]!.blockers[0]!.resolution_note).toContain(
+      "requirements + architecture",
+    );
+  });
+
+  it("unskip throws when step is not skipped", async () => {
+    const { ctx } = await tmpRepo();
+    await expect(runUnskip(ctx, { step: "1", reason: "retry" })).rejects.toThrow(
+      /không ở trạng thái skipped/,
+    );
+  });
+
+  it("unskip restores step without pulling current_step when step is ahead", async () => {
+    const { ctx } = await tmpRepo();
+    const stateFile = ctx.stateFile!;
+    const st = FlowctlStateSchema.parse(
+      JSON.parse(await readFile(stateFile, "utf-8")),
+    );
+    st.current_step = 3;
+    const step3 = st.steps["3"];
+    if (!step3) throw new Error("fixture: missing step 3");
+    st.steps["3"] = {
+      ...step3,
+      status: "skipped",
+      skip_reason: "api-only",
+      skip_type: "preset",
+      skipped_by: "PM",
+      skipped_at: "2026-01-02",
+    };
+    await writeState(stateFile, st);
+
+    await runUnskip(ctx, { step: "3", reason: "need design" });
+
+    const after = FlowctlStateSchema.parse(
+      JSON.parse(await readFile(stateFile, "utf-8")),
+    );
+    expect(after.current_step).toBe(3);
+    expect(after.steps["3"]!.status).toBe("pending");
   });
 
   it("unskip restores step and pulls current_step back; removes context digest", async () => {

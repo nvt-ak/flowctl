@@ -289,9 +289,45 @@ describe("mcp-health", () => {
       const mod = await import("@/utils/mcp-health");
       const spy = vi.spyOn(mod, "runMcpHealthCheck").mockResolvedValue();
       const ctx = await setupCommandCtx();
+      const logs: string[] = [];
+      const log = vi.spyOn(console, "log").mockImplementation((msg: unknown) => {
+        logs.push(String(msg));
+      });
+
       await runCursorDispatch(ctx, { merge: true, skipWarRoom: true });
+
       expect(spy).toHaveBeenCalledWith(ctx);
+      expect(logs.join("\n")).toContain("War Room merge");
       spy.mockRestore();
+      log.mockRestore();
+    });
+
+    it("runCursorDispatch with --skip-war-room runs dispatch dry-run", async () => {
+      const mod = await import("@/utils/mcp-health");
+      const healthSpy = vi.spyOn(mod, "runMcpHealthCheck").mockResolvedValue();
+      const dispatchMod = await import("@/commands/dispatch/index");
+      const dispatchSpy = vi.spyOn(dispatchMod, "runDispatch").mockResolvedValue(undefined);
+      const boardMod = await import("@/commands/cursor-dispatch/board");
+      const boardSpy = vi.spyOn(boardMod, "printSpawnBoard").mockResolvedValue(undefined);
+      const logs: string[] = [];
+      const log = vi.spyOn(console, "log").mockImplementation((msg: unknown) => {
+        logs.push(String(msg));
+      });
+
+      const ctx = await setupCommandCtx();
+      await runCursorDispatch(ctx, { skipWarRoom: true });
+
+      expect(healthSpy).toHaveBeenCalledWith(ctx);
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({ dryRun: true, headless: false }),
+      );
+      expect(boardSpy).toHaveBeenCalled();
+      expect(logs.join("\n")).toContain("Generating briefs");
+      healthSpy.mockRestore();
+      dispatchSpy.mockRestore();
+      boardSpy.mockRestore();
+      log.mockRestore();
     });
   });
 });

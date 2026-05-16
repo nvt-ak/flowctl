@@ -65,8 +65,28 @@ describe("Phase 3 workflow commands", () => {
     expect(state.ok).toBe(true);
     if (state.ok) {
       expect(state.data.steps["1"]?.approval_status).toBe("approved");
+      expect(state.data.steps["1"]?.approved_by).toBe("Tester");
       expect(Number(state.data.current_step)).toBe(2);
     }
+  });
+
+  it("approve without skip-gate blocks when QA gate fails", async () => {
+    const ctx = await setupWorkflow();
+    await runStart(ctx);
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await runApprove(ctx, { by: "Gate Reviewer" });
+
+    expect(process.exitCode).toBe(1);
+    const state = await readState(ctx.stateFile!);
+    expect(state.ok).toBe(true);
+    if (state.ok) {
+      expect(state.data.steps["1"]?.approval_status).not.toBe("approved");
+    }
+    err.mockRestore();
+    log.mockRestore();
+    process.exitCode = undefined;
   });
 
   it("reject records rejection decision", async () => {

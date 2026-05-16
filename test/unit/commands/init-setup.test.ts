@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -141,5 +141,54 @@ describe("init/setup runSetup modes", () => {
     const code = await runSetup({ mode: "mcp-only", deps, printSummary: false });
     expect(code).toBe(0);
     expect(deps.log?.warn).toHaveBeenCalled();
+  });
+
+  it("checkPrerequisites fails when pip is missing", async () => {
+    const deps = await mockDeps({
+      commandExists: async (cmd) => cmd === "python3",
+    });
+    await expect(runSetup({ mode: "mcp-only", deps, printSummary: false })).rejects.toThrow(
+      /pip is required/,
+    );
+  });
+
+  it("installGraphify throws when pip install fails", async () => {
+    const run = vi.fn(async (cmd: string, args: string[]) => {
+      if (cmd === "python3" && args[0] === "-c") {
+        return { ok: false, stdout: "", stderr: "No module named graphify" };
+      }
+      if (cmd === "pip" || cmd === "pip3") {
+        return { ok: false, stdout: "", stderr: "install failed" };
+      }
+      return { ok: true, stdout: "", stderr: "" };
+    });
+    const deps = await mockDeps({ run });
+    await expect(runSetup({ mode: "index-only", deps, printSummary: false })).rejects.toThrow(
+      /Could not install Graphify/,
+    );
+  });
+
+  it("configureCursorMcp throws when merge exits non-zero", async () => {
+    const deps = await mockDeps({
+      mergeMcp: vi.fn(async () => ({
+        exitCode: 1,
+        lines: ["MCP_STATUS=error"],
+      })),
+    });
+    await expect(runSetup({ mode: "mcp-only", deps, printSummary: false })).rejects.toThrow(
+      /mergeCursorMcp failed/,
+    );
+  });
+
+  it("updateGitignore preserves existing lines and only appends missing entries", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "flowctl-setup-gi-exist-"));
+    const gitignorePath = join(dir, ".gitignore");
+    await writeFile(gitignorePath, "custom-entry/\n.flowctl/\n", "utf-8");
+    await updateGitignore(dir);
+    const raw = await readFile(gitignorePath, "utf-8");
+    expect(raw).toContain("custom-entry/");
+    expect(raw).toContain(".flowctl/");
+    expect(raw).toContain("node_modules/");
+    expect(raw.split("\n").filter((l) => l === ".flowctl/")).toHaveLength(1);
   });
 });
