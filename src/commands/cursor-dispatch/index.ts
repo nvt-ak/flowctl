@@ -11,6 +11,7 @@ import {
   persistDispatchFlags,
   printWarRoomPause,
 } from "@/commands/cursor-dispatch/war-room-gate";
+import { runMcpHealthCheck } from "@/utils/mcp-health";
 import { getStepName, requireCurrentStep } from "@/workflow/step-utils";
 
 export type CursorDispatchOptions = {
@@ -30,6 +31,8 @@ export async function runCursorDispatch(
   if (!read.ok) throw new Error(read.error);
 
   const step = String(requireCurrentStep(read.data));
+
+  await runMcpHealthCheck(ctx);
 
   if (opts.merge) {
     console.log(

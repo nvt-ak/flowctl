@@ -4,6 +4,7 @@ import { requireStateFile } from "@/cli/context";
 import { readState } from "@/state/reader";
 import { setPath } from "@/state/writer";
 import { nowTimestamp } from "@/utils/time";
+import { runMcpHealthCheck } from "@/utils/mcp-health";
 import {
   activeIndexForStep,
   advancePastSkipped,
@@ -66,4 +67,5 @@ export async function runStart(ctx: FlowctlContext): Promise<void> {
     console.log(`  ${chalk.cyan("cat graphify-out/GRAPH_REPORT.md")} ← code structure`);
   }
   console.log(`\nView agent guide: ${chalk.bold(`.cursor/agents/${agent}-agent.md`)}\n`);
+  await runMcpHealthCheck(ctx);
 }
