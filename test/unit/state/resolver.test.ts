@@ -93,6 +93,64 @@ describe("resolveStatePath", () => {
     expect(result.stateFile).toMatch(/ab[/\\]state\.json$/);
   });
 
+  it("active flow without state_file falls back to registry", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "flowctl-res-registry-"));
+    const repo = join(tmp, "repo");
+    await mkdir(repo, { recursive: true });
+    const fid = "wf-aaaaaaaa-bbbb-cccc-dddddddddddd";
+    const home = join(tmp, "home");
+    const cacheDir = join(home, "projects", "proj1", "cache");
+    const workflowDir = join(cacheDir, "..", "workflow");
+    await mkdir(workflowDir, { recursive: true });
+    const statePath = join(workflowDir, "state.json");
+    await writeFile(statePath, JSON.stringify({ flow_id: fid }));
+    await writeFile(
+      join(home, "projects", "proj1", "meta.json"),
+      JSON.stringify({
+        project_id: fid,
+        path: repo,
+        cache_dir: cacheDir,
+      }),
+    );
+    await mkdir(join(repo, ".flowctl"), { recursive: true });
+    await writeFile(
+      join(repo, ".flowctl", "flows.json"),
+      JSON.stringify({
+        version: 1,
+        active_flow_id: fid,
+        flows: {
+          [fid]: { label: "no state_file field" },
+        },
+      }),
+    );
+    const result = await resolveStatePath(repo, {}, { flowctlHome: home });
+    expect(result.source).toBe("env_active_flow");
+    expect(result.stateFile).toBe(statePath);
+  });
+
+  it("active flow without state_file and registry miss → not_initialized", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "flowctl-res-no-sf-"));
+    const repo = join(tmp, "repo");
+    await mkdir(repo, { recursive: true });
+    const fid = "wf-bbbbbbbb-cccc-dddd-eeeeeeeeeeee";
+    await mkdir(join(repo, ".flowctl"), { recursive: true });
+    await writeFile(
+      join(repo, ".flowctl", "flows.json"),
+      JSON.stringify({
+        version: 1,
+        active_flow_id: fid,
+        flows: {
+          [fid]: { label: "missing state_file" },
+        },
+      }),
+    );
+    const home = join(tmp, "home");
+    await mkdir(join(home, "projects"), { recursive: true });
+    const result = await resolveStatePath(repo, {}, { flowctlHome: home });
+    expect(result.source).toBe("not_initialized");
+    expect(result.stateFile).toBeNull();
+  });
+
   it("registry miss with active flow only → not_initialized", async () => {
     const tmp = await mkdtemp(join(tmpdir(), "flowctl-res-"));
     const repo = join(tmp, "repo");

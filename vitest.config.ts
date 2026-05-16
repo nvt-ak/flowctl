@@ -19,8 +19,9 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      reporter: ["text", "lcov", "html"],
-      // Phase 7 migration-plan target (enforce once aggregate lines ≥ 85%):
+      reporter: ["text", "lcov", "html", "json-summary"],
+      thresholds: { statements: 70, branches: 60, functions: 70, lines: 70 }, // tăng dần mỗi phase
+      // Phase 7 migration-plan target (95% legacy-deletion gate):
       // thresholds: { statements: 85, branches: 80, functions: 85, lines: 85 },
       watermarks: {
         statements: [85, 95],

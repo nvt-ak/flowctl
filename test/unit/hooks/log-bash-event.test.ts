@@ -16,13 +16,32 @@ describe("hooks/log-bash-event", () => {
     expect(estimateTokens("")).toBe(0);
   });
 
-  it("checkWasteful matches git status and wf_state alternatives", () => {
-    const git = checkWasteful("git status");
-    expect(git.suggestion).toBe("wf_git()");
-    expect(git.mcpAltTokens).toBe(110);
+  it.each([
+    ["git log --oneline -5", "wf_git()", 110],
+    ["git status", "wf_git()", 110],
+    ["git diff HEAD~1", "wf_git()", 110],
+    ["git branch -a", "wf_git()", 110],
+    ["cat flowctl-state.json", "wf_state()", 95],
+    ["cat package.json", "wf_read(path)", 400],
+    ["ls -la src", "wf_files()", 90],
+    ["find . -name '*.ts'", "wf_files()", 90],
+    ["wc -l README.md", "wf_read(path)", 400],
+    ["python3 -c 'import json; print(open(\"flowctl-state.json\").read())'", "wf_state()", 95],
+    ["bash scripts/flowctl.sh status", "wf_state()", 95],
+  ] as const)("checkWasteful maps %j to %s", (command, suggestion, mcpAltTokens) => {
+    const result = checkWasteful(command);
+    expect(result.suggestion).toBe(suggestion);
+    expect(result.mcpAltTokens).toBe(mcpAltTokens);
+  });
 
-    const state = checkWasteful("cat flowctl-state.json");
-    expect(state.suggestion).toBe("wf_state()");
+  it("checkWasteful returns null for benign commands", () => {
+    expect(checkWasteful("npm test")).toEqual({ suggestion: null, mcpAltTokens: 0 });
+  });
+
+  it("estimateTokens uses vietnamese-heavy heuristic", () => {
+    const viet = "Đây là văn bản tiếng Việt dài hơn để kích hoạt heuristic";
+    const ascii = "a".repeat(viet.length);
+    expect(estimateTokens(viet)).toBeGreaterThan(estimateTokens(ascii));
   });
 
   it("handleCursorBeforeShell logs and returns continue JSON with agentMessage", async () => {

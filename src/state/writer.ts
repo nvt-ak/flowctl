@@ -5,7 +5,6 @@ import {
   type FlowctlState,
 } from "@/state/schema";
 import { defaultState } from "@/state/default-state";
-import { readState } from "@/state/reader";
 import { appendAtPath, setAtPath } from "@/utils/dot-path";
 import { atomicJsonWrite } from "@/utils/json";
 import { pathExists } from "@/utils/fs";
@@ -81,21 +80,4 @@ export async function writeState(
   await mkdir(dirname(stateFile), { recursive: true });
   const parsed = FlowctlStateSchema.parse(state);
   await writeFile(stateFile, JSON.stringify(parsed, null, 2), "utf-8");
-}
-
-export async function getPathFromFile(
-  stateFile: string,
-  dotPath: string,
-): Promise<unknown> {
-  const result = await readState(stateFile);
-  if (!result.ok) return undefined;
-  const keys = dotPath.split(".");
-  let val: unknown = result.data;
-  for (const k of keys) {
-    if (val === null || val === undefined || typeof val !== "object") {
-      return undefined;
-    }
-    val = (val as Record<string, unknown>)[k];
-  }
-  return val;
 }

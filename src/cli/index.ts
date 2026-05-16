@@ -29,6 +29,7 @@ import { runSummary } from "@/commands/summary";
 import { runHistory } from "@/commands/history";
 import { runReleaseDashboard } from "@/commands/release-dashboard";
 import { runInit } from "@/commands/init";
+import { runLegacyDeletionGate } from "@/commands/legacy-deletion-gate";
 import { runMcp, type McpCliOptions } from "@/commands/mcp";
 import { runAuditTokens, type AuditTokensCliOptions } from "@/commands/audit-tokens";
 import { runMonitor } from "@/commands/monitor";
@@ -727,7 +728,7 @@ program
   .description("Initialize project (MCP merge: TS when FLOWCTL_ENGINE=ts, Python default)")
   .option("--project <name>", "Project name")
   .option("--overwrite", "Overwrite scaffold / reset active flow state")
-  .option("--no-setup", "Skip setup.sh")
+  .option("--no-setup", "Skip Graphify/MCP setup")
   .action(async (opts: { project?: string; overwrite?: boolean; noSetup?: boolean }) => {
     try {
       const ctx = await getContext();
@@ -737,6 +738,21 @@ program
         noSetup: opts.noSetup === true,
       });
       invalidateContextCache();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(message);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("legacy-deletion-gate")
+  .description("Gate trước khi xóa large legacy files (cleanup plan §1E)")
+  .option("--skip-run", "Chỉ đọc coverage summary + quét src imports (không chạy vitest/tsc)")
+  .action(async (opts: { skipRun?: boolean }) => {
+    try {
+      const ctx = await getContext();
+      await runLegacyDeletionGate(ctx, { skipRun: opts.skipRun === true });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(message);

@@ -1,9 +1,7 @@
 /**
  * Shell-proxy cache helpers — wraps {@link ShellProxyCache} with JS parity helpers.
+ * Import {@link ShellProxyCache} and {@link CacheStrategy} from `@/mcp/cache`.
  */
-export { ShellProxyCache } from "@/mcp/cache";
-export type { CacheStrategy } from "@/mcp/cache";
-
 import { resolve } from "node:path";
 import { ShellProxyCache } from "@/mcp/cache";
 

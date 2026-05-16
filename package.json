@@ -85,6 +85,8 @@
     "test:python": "python3 -m pytest tests/ -q",
     "test:legacy": "bash test/test-package-files.sh && bash test/test-merge-cursor-mcp.sh && bash test/test-workflow-tdd-regression.sh && bash test/test-complexity-war-room.sh",
     "test": "bun vitest run --coverage",
+    "legacy-deletion:gate": "flowctl legacy-deletion-gate",
+    "legacy-deletion:gate:check": "flowctl legacy-deletion-gate --skip-run",
     "ci:gate": "npm run typecheck && npm run test:unit && npm run test:integration",
     "ci": "npm run ci:gate && npm run test:python && npm run test:legacy",
     "test:package": "bash test/test-package-files.sh",

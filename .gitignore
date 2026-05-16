@@ -32,3 +32,5 @@ brainstorm.md
 .cursor/plans/
 test/unit/workflow/.gate-*
 .DS_Store
+.flowctl/projects/
+.flowctl-local/

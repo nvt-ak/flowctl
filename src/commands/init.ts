@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
   copyFile,
@@ -23,6 +22,7 @@ import {
 import { defaultState } from "@/state/default-state";
 import { readState } from "@/state/reader";
 import { FlowctlStateSchema } from "@/state/schema";
+import { runSetup } from "@/commands/init/setup";
 import { mergeCursorMcp } from "@/integrations/mcp-merge";
 import { atomicJsonWrite } from "@/utils/json";
 import { pathExists } from "@/utils/fs";
@@ -287,10 +287,10 @@ async function maybeRunSetup(
   workflowRoot: string,
   projectRoot: string,
   isNewProject: boolean,
-  runSetup: boolean,
+  shouldRunSetup: boolean,
 ): Promise<void> {
-  if (!runSetup || !isNewProject) {
-    if (runSetup && !isNewProject) {
+  if (!shouldRunSetup || !isNewProject) {
+    if (shouldRunSetup && !isNewProject) {
       console.log(
         chalk.cyan(
           "Project exists — skip setup (use --overwrite to run setup again).",
@@ -299,34 +299,33 @@ async function maybeRunSetup(
     }
     return;
   }
-  const setupScript = join(workflowRoot, "scripts", "setup.sh");
-  if (!(await pathExists(setupScript))) {
-    console.warn(chalk.yellow(`setup not found: ${setupScript} (skip)`));
-    return;
-  }
   console.log(chalk.cyan("Run setup (Graphify, MCP, .gitignore)..."));
-  const code = await new Promise<number>((res, rej) => {
-    const env = { ...process.env, FLOWCTL_PROJECT_ROOT: projectRoot };
-    const sh = spawn("bash", [setupScript], {
-      cwd: projectRoot,
-      env,
-      stdio: "inherit",
+  try {
+    const code = await runSetup({
+      projectRoot,
+      workflowRoot,
+      printSummary: false,
     });
-    sh.on("error", rej);
-    sh.on("close", (c) => res(c ?? 1));
-  });
-  if (code === 0) console.log(chalk.green("Setup completed."));
-  else
+    if (code === 0) console.log(chalk.green("Setup completed."));
+    else
+      console.warn(
+        chalk.yellow(
+          `setup exited ${code} — run again: FLOWCTL_PROJECT_ROOT="${projectRoot}" flowctl init`,
+        ),
+      );
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
     console.warn(
       chalk.yellow(
-        `setup.sh exited ${code} — run again: FLOWCTL_PROJECT_ROOT="${projectRoot}" bash "${setupScript}"`,
+        `setup failed: ${msg} — run again with FLOWCTL_PROJECT_ROOT="${projectRoot}"`,
       ),
     );
+  }
 }
 
 /**
  * Partial `flowctl init` (Phase 3 week 4): flows bootstrap, state finalize, scaffold,
- * optional setup.sh. MCP merge: TypeScript `mergeCursorMcp` (Phase 4).
+ * optional setup (TypeScript `runSetup`). MCP merge: TypeScript `mergeCursorMcp` (Phase 4).
  */
 export async function runInit(ctx: FlowctlContext, opts: InitOptions = {}): Promise<void> {
   const skipSetup =

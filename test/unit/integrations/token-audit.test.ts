@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   analyze,
   analyzeByTask,
+  buildJsonPayload,
   eventTaskKey,
   graphifyStatus,
   inferTier,
@@ -143,5 +144,48 @@ describe("token-audit", () => {
     expect(rows[0]?.compactLines).toBe(3);
     expect(rows[0]?.lazyLines).toBe(2);
     expect(rows[0]?.lazyFragments).toBe(1);
+  });
+
+  it("parseSkillManifestForSizes marks missing compact/lazy entries", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "flowctl-skillsz-miss-"));
+    const manPath = join(dir, "manifest.json");
+    await writeFile(
+      manPath,
+      JSON.stringify({
+        skills_with_detail: [
+          { id: "broken", compact: 123, lazy: "not-array" },
+          {
+            id: "missing-files",
+            compact: ".cursor/skills/nope/SKILL.md",
+            lazy: [".cursor/skills/nope/refs/x.md"],
+          },
+        ],
+      }),
+      "utf-8",
+    );
+    const rows = await parseSkillManifestForSizes(dir, manPath);
+    expect(rows.find((r) => r.id === "broken")?.missing).toBe(true);
+    expect(rows.find((r) => r.id === "missing-files")?.missing).toBe(true);
+  });
+
+  it("buildJsonPayload omits per_tool and includes graphify + tasks", () => {
+    const events = [{ tool: "wf_state", output_tokens: 5, cache: "hit", task_id: "t1" }];
+    const stats = analyze(events);
+    const tasks = analyzeByTask(events);
+    const session = { bash_calls: 2 };
+    const graph = { status: "MISSING" as const, nodes: 0, relationships: 0 };
+    const payload = buildJsonPayload(stats, tasks, session, graph);
+    expect(payload).not.toHaveProperty("per_tool");
+    expect(payload.total_calls).toBe(1);
+    expect(payload.tasks).toEqual(tasks);
+    expect(payload.session).toEqual(session);
+    expect(payload.graphify).toEqual(graph);
+  });
+
+  it("graphifyStatus returns CORRUPT for invalid JSON", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "flowctl-graph-bad-"));
+    const badPath = join(dir, "bad.json");
+    await writeFile(badPath, "{broken", "utf-8");
+    expect(graphifyStatus(badPath).status).toBe("CORRUPT");
   });
 });

@@ -25,4 +25,40 @@ describe("buildContextSnapshot", () => {
     expect(md).toContain("**FRESH**");
     expect(md).toContain("dispatch_risk");
   });
+
+  it("uses defaults when dispatch_risk is absent", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "flowctl-ctx-risk-"));
+    const state = defaultState();
+    delete state.steps["1"]!.dispatch_risk;
+
+    const md = await buildContextSnapshot({
+      state,
+      step: "1",
+      repoRoot: tmp,
+      dispatchBase: join(tmp, "workflows", "dispatch"),
+      generatedAt: new Date(),
+    });
+
+    expect(md).toContain("(defaults — no PM risk flags set)");
+  });
+
+  it("handles missing step key with empty metadata", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "flowctl-ctx-miss-"));
+    const state = defaultState();
+    delete state.steps["99"];
+
+    const md = await buildContextSnapshot({
+      state,
+      step: "99",
+      repoRoot: tmp,
+      dispatchBase: join(tmp, "workflows", "dispatch"),
+      generatedAt: new Date(Date.now() - 60 * 60_000),
+    });
+
+    expect(md).toContain("## Context Snapshot (Step 99:");
+    expect(md).toContain("**⚠ STALE**");
+    expect(md).toContain("(none recorded on this step)");
+    expect(md).toContain("| Status |  |");
+    expect(md).toContain("| Primary | `` |");
+  });
 });

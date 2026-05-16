@@ -1,16 +1,3 @@
-/** Navigate dot-separated path on nested objects. */
-export function getAtPath(obj: unknown, dotPath: string): unknown {
-  const keys = dotPath.split(".");
-  let val: unknown = obj;
-  for (const k of keys) {
-    if (val === null || val === undefined || typeof val !== "object") {
-      return undefined;
-    }
-    val = (val as Record<string, unknown>)[k];
-  }
-  return val;
-}
-
 /** Set value at dot-path, creating intermediate objects as needed. */
 export function setAtPath(
   obj: Record<string, unknown>,

@@ -71,6 +71,42 @@ describe("hooks/token-report", () => {
     expect(md).toContain("wf_state");
   });
 
+  it("buildTokenReportMarkdown shows 0% efficiency when no tokens consumed or saved", () => {
+    const md = buildTokenReportMarkdown({
+      step: 1,
+      stepName: "Empty",
+      stats: { tools: {} },
+      events: [],
+      nowLabel: "fixed",
+    });
+    expect(md).toContain("| Efficiency            | 0% |");
+    expect(md).not.toContain("Top Token Waste");
+  });
+
+  it("buildTokenReportMarkdown flags low cache hit tools", () => {
+    const md = buildTokenReportMarkdown({
+      step: 3,
+      stepName: "Build",
+      stats: {
+        tools: {
+          wf_git: { calls: 5, hits: 1, saved: 20 },
+          wf_state: { calls: 10, hits: 9, saved: 500 },
+        },
+        total_consumed_tokens: 800,
+        total_saved_tokens: 200,
+        total_cost_usd: 0.12,
+        total_saved_usd: 0.03,
+      },
+      events: [],
+      nowLabel: "fixed",
+    });
+    expect(md).toContain("Low Cache Hit Rate");
+    expect(md).toContain("wf_git");
+    expect(md).toContain("⚠️");
+    expect(md).toContain("$0.1200");
+    expect(md).toContain("$0.0300");
+  });
+
   it("buildTokenReportMarkdown lists bash waste", () => {
     const md = buildTokenReportMarkdown({
       step: 1,
@@ -136,5 +172,34 @@ describe("hooks/token-report", () => {
     expect(await readFile(archived, "utf-8")).toContain("total_consumed_tokens");
     const nextStats = JSON.parse(await readFile(statsPath, "utf-8")) as { previous_step?: number };
     expect(nextStats.previous_step).toBe(1);
+  });
+
+  it("runGenerateTokenReport works with empty events and no stats file", async () => {
+    const repo = await mkdtemp(join(tmpdir(), "flowctl-tr-empty-"));
+    const cache = join(repo, ".cache", "mcp");
+    await mkdir(cache, { recursive: true });
+    const statePath = join(repo, "flowctl-state.json");
+    await writeFile(
+      statePath,
+      JSON.stringify({ current_step: 1, steps: { "1": { name: "Kickoff" } } }),
+      "utf-8",
+    );
+
+    const lines = await runGenerateTokenReport({
+      repoRoot: repo,
+      env: {
+        FLOWCTL_CACHE_DIR: cache,
+        FLOWCTL_EVENTS_F: join(cache, "missing-events.jsonl"),
+        FLOWCTL_STATS_F: join(cache, "missing-stats.json"),
+        FLOWCTL_STATE_FILE: statePath,
+      },
+      explicitStep: 1,
+    });
+
+    expect(lines[0]).toMatch(/Token report:/);
+    const reportPath = join(repo, "workflows", "dispatch", "step-1", "token-report.md");
+    const body = await readFile(reportPath, "utf-8");
+    expect(body).toContain("Step 1: Kickoff");
+    expect(body).toContain("| Efficiency            | 0% |");
   });
 });

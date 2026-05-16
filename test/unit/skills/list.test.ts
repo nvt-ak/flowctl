@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { listSkills } from "@/skills/list";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { listSkills, runListSkills } from "@/skills/list";
 import { makeSkillsProject, writeSkillsIndex } from "./helpers";
 
 describe("skills/list", () => {
@@ -33,5 +33,56 @@ describe("skills/list", () => {
     const skills = listSkills(root, { tag: "quality" });
     expect(skills).toHaveLength(1);
     expect(skills[0]?.name).toBe("a");
+  });
+
+  it("runListSkills prints table rows for matching skills", async () => {
+    const { root, cleanup } = await makeSkillsProject();
+    cleanups.push(cleanup);
+    await writeSkillsIndex(root, [{ name: "alpha", path: "core/a/SKILL.md", description: "Alpha skill" }]);
+
+    expect(listSkills(root, {}).map((s) => s.name)).toEqual(["alpha"]);
+
+    const messages: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      messages.push(args.map(String).join(" "));
+    });
+    const code = runListSkills(["--project-root", root]);
+    log.mockRestore();
+
+    expect(code).toBe(0);
+    expect(messages).toContain("alpha - Alpha skill");
+  });
+
+  it("runListSkills prints json when --format json", async () => {
+    const { root, cleanup } = await makeSkillsProject();
+    cleanups.push(cleanup);
+    await writeSkillsIndex(root, [{ name: "alpha", path: "core/a/SKILL.md" }]);
+
+    const messages: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      messages.push(args.map(String).join(" "));
+    });
+    const code = runListSkills(["--project-root", root, "--format", "json"]);
+    log.mockRestore();
+
+    expect(code).toBe(0);
+    const payload = JSON.parse(messages[0]!) as Array<{ name: string }>;
+    expect(payload[0]?.name).toBe("alpha");
+  });
+
+  it("runListSkills prints empty message when no skills match filters", async () => {
+    const { root, cleanup } = await makeSkillsProject();
+    cleanups.push(cleanup);
+    await writeSkillsIndex(root, [{ name: "a", path: "core/a/SKILL.md", tags: ["quality"] }]);
+
+    const messages: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      messages.push(args.map(String).join(" "));
+    });
+    const code = runListSkills(["--project-root", root, "--tag", "missing-tag"]);
+    log.mockRestore();
+
+    expect(code).toBe(0);
+    expect(messages).toContain("No skills found.");
   });
 });
