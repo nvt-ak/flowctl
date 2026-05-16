@@ -65,13 +65,13 @@ describe("commands/init runInit", () => {
   });
 
   async function initCtx(repo: string, workflowRoot: string): Promise<FlowctlContext> {
-    const paths = await refreshRuntimePaths(repo);
+    const paths = await refreshRuntimePaths(repo, null);
     return {
       projectRoot: repo,
       workflowRoot,
       paths,
       stateFile: null,
-      resolveSource: "cwd",
+      resolveSource: "not_initialized",
     };
   }
 

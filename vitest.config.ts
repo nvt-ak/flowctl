@@ -20,9 +20,8 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov", "html", "json-summary"],
-      thresholds: { statements: 70, branches: 60, functions: 70, lines: 70 }, // tăng dần mỗi phase
-      // Phase 7 migration-plan target (95% legacy-deletion gate):
-      // thresholds: { statements: 85, branches: 80, functions: 85, lines: 85 },
+      // Vitest floor (Phase C7). Ship gate 95%: DEFAULT_LEGACY_COVERAGE_THRESHOLDS + `LEGACY_DELETION_GATE_STRICT=1`.
+      thresholds: { statements: 84, branches: 68, functions: 86, lines: 86 },
       watermarks: {
         statements: [85, 95],
         branches: [80, 95],
