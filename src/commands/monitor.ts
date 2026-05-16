@@ -3,7 +3,7 @@
  */
 import { execa } from "execa";
 import type { FlowctlContext } from "@/cli/context";
-import { prepareMonitorWebLaunch, sliceMonitorPassthrough } from "@/integrations/monitor-web-resolve";
+import { prepareMonitorWebLaunch } from "@/integrations/monitor-web-resolve";
 
 export async function runMonitor(
   ctx: FlowctlContext,

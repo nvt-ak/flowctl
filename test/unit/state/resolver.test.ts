@@ -3,7 +3,6 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { migrateLegacyState } from "@/state/migrate";
 import { resolveStatePathWithMigration } from "@/state/resolve-with-migration";
 import { resolveStatePath } from "@/state/resolver";
 

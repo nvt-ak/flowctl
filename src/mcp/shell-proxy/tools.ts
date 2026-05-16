@@ -680,7 +680,7 @@ export function buildShellProxyTools(ctx: ShellProxyContext): ShellTool[] {
 }
 
 export function handleShellToolCall(
-  ctx: ShellProxyContext,
+  _ctx: ShellProxyContext,
   tools: ShellTool[],
   name: string,
   rawArgs: unknown,
