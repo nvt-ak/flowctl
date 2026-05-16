@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+if command -v bun &>/dev/null && [[ -f "$ROOT/src/hooks/git-guards.ts" ]]; then
+  exec bun run "$ROOT/src/hooks/git-guards.ts" pre-commit
+fi
 
 current_branch="$(git rev-parse --abbrev-ref HEAD)"
 

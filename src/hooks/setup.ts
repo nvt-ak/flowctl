@@ -5,27 +5,45 @@ import { chmodSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const preCommit = `#!/usr/bin/env bash
-bash "$(git rev-parse --show-toplevel)/scripts/hooks/prevent-main-commit.sh"
+set -euo pipefail
+repo_root="$(git rev-parse --show-toplevel)"
+if command -v bun &>/dev/null && [[ -f "$repo_root/src/hooks/git-guards.ts" ]]; then
+  exec bun run "$repo_root/src/hooks/git-guards.ts" pre-commit
+else
+  exec bash "$repo_root/scripts/hooks/prevent-main-commit.sh"
+fi
 `;
 
 const prePush = `#!/usr/bin/env bash
 set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
-bash "$repo_root/scripts/hooks/prevent-main-push.sh"
+if command -v bun &>/dev/null && [[ -f "$repo_root/src/hooks/git-guards.ts" ]]; then
+  bun run "$repo_root/src/hooks/git-guards.ts" pre-push
+else
+  bash "$repo_root/scripts/hooks/prevent-main-push.sh"
+fi
 cd "$repo_root" && npm run test:gate:local
 `;
 
+const invalidateGit = `if command -v bun &>/dev/null && [[ -f "$repo_root/src/hooks/invalidate-cache.ts" ]]; then
+  bun run "$repo_root/src/hooks/invalidate-cache.ts" git 2>/dev/null || true
+else
+  bash "$repo_root/scripts/hooks/invalidate-cache.sh" git 2>/dev/null || true
+fi`;
+
 const postCommit = `#!/usr/bin/env bash
-# Auto-invalidate MCP shell proxy git cache
-bash "$(git rev-parse --show-toplevel)/scripts/hooks/invalidate-cache.sh" git 2>/dev/null || true
+repo_root="$(git rev-parse --show-toplevel)"
+${invalidateGit}
 `;
 
 const postMerge = `#!/usr/bin/env bash
-bash "$(git rev-parse --show-toplevel)/scripts/hooks/invalidate-cache.sh" git 2>/dev/null || true
+repo_root="$(git rev-parse --show-toplevel)"
+${invalidateGit}
 `;
 
 const postCheckout = `#!/usr/bin/env bash
-bash "$(git rev-parse --show-toplevel)/scripts/hooks/invalidate-cache.sh" git 2>/dev/null || true
+repo_root="$(git rev-parse --show-toplevel)"
+${invalidateGit}
 `;
 
 /** Hook name → script body (same semantics as setup-git-hooks.mjs). */

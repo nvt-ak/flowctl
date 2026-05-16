@@ -32,6 +32,7 @@ import { runInit } from "@/commands/init";
 import { runMcp, type McpCliOptions } from "@/commands/mcp";
 import { runAuditTokens, type AuditTokensCliOptions } from "@/commands/audit-tokens";
 import { runMonitor } from "@/commands/monitor";
+import { runHookCommand } from "@/commands/hook";
 import { sliceMonitorPassthrough } from "@/integrations/monitor-web-resolve";
 import { runComplexity } from "@/commands/complexity";
 import { runBudgetStatus } from "@/commands/budget";
@@ -685,6 +686,13 @@ program
       );
     },
   );
+
+program
+  .command("hook <name> [hookArgs...]")
+  .description("Internal hook runner (log-bash-event, invalidate-cache, session-start)")
+  .action(async (name: string, hookArgs: string[]) => {
+    await runCommand("hook", (ctx) => runHookCommand(ctx, name, hookArgs));
+  });
 
 program
   .command("monitor")

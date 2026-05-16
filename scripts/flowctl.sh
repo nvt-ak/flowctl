@@ -1605,14 +1605,23 @@ case "$CMD" in
     _hook_name="${1:-}"; shift || true
     case "$_hook_name" in
       log-bash-event|log_bash_event|cursor-shell-event|cursor_shell_event)
-        # Both Claude Code PostToolUse and Cursor beforeShellExecution are handled
-        # by the same script — format is auto-detected from stdin hook_event_name field.
-        python3 "$WORKFLOW_ROOT/scripts/hooks/log-bash-event.py" "$@" 2>/dev/null || true ;;
+        # Both Claude Code PostToolUse and Cursor beforeShellExecution — format from stdin hook_event_name.
+        if command -v bun &>/dev/null && [[ -f "$WORKFLOW_ROOT/src/hooks/runner.ts" ]]; then
+          (cd "$PROJECT_ROOT" && FLOWCTL_STATE_FILE="${STATE_FILE:-}" bun run "$WORKFLOW_ROOT/src/hooks/runner.ts" log-bash-event "$@") 2>/dev/null || true
+        else
+          python3 "$WORKFLOW_ROOT/scripts/hooks/log-bash-event.py" "$@" 2>/dev/null || true
+        fi ;;
       invalidate-cache|invalidate_cache)
-        bash "$WORKFLOW_ROOT/scripts/hooks/invalidate-cache.sh" "${1:-state}" 2>/dev/null || true ;;
+        if command -v bun &>/dev/null && [[ -f "$WORKFLOW_ROOT/src/hooks/runner.ts" ]]; then
+          (cd "$PROJECT_ROOT" && bun run "$WORKFLOW_ROOT/src/hooks/runner.ts" invalidate-cache "${1:-state}") 2>/dev/null || true
+        else
+          bash "$WORKFLOW_ROOT/scripts/hooks/invalidate-cache.sh" "${1:-state}" 2>/dev/null || true
+        fi ;;
       session-start|session_start)
-        # Print workflow status systemMessage for Claude Code SessionStart
-        [[ -f "$STATE_FILE" ]] && python3 - <<'PY' 2>/dev/null || true
+        if command -v bun &>/dev/null && [[ -f "$WORKFLOW_ROOT/src/hooks/runner.ts" ]]; then
+          (cd "$PROJECT_ROOT" && FLOWCTL_STATE_FILE="${STATE_FILE:-}" bun run "$WORKFLOW_ROOT/src/hooks/runner.ts" session-start) 2>/dev/null || true
+        elif [[ -f "$STATE_FILE" ]]; then
+          _FLOWCTL_SF="$STATE_FILE" python3 - <<'PY' 2>/dev/null || true
 import json, os
 from pathlib import Path
 state_f = Path(os.environ.get("_FLOWCTL_SF", "flowctl-state.json"))
@@ -1629,7 +1638,7 @@ print(json.dumps({"systemMessage":
     f'[Workflow] {d.get("project_name","?")} | {status} | Step {s}: {name} | @{agent} | Blockers: {blockers} | Use wf_state() not cat | Monitor: flowctl monitor'
 }))
 PY
-        ;;
+        fi ;;
       *)
         wf_error "Unknown hook: ${_hook_name:-<empty>}"
         wf_info "Available: log-bash-event, invalidate-cache, session-start"

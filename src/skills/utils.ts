@@ -311,13 +311,63 @@ export function readPackageVersion(projectRoot: string): string {
   }
 }
 
-export function loadIndex(projectRoot: string): { indexPath: string; index: unknown } {
+export type SkillIndexEntry = {
+  name: string;
+  path: string;
+  description: string;
+  triggers: string[];
+  when_to_use: string;
+  when_not_to_use: string;
+  prerequisites: string[];
+  estimated_tokens: number;
+  roles_suggested: string[];
+  version: string;
+  tags: string[];
+};
+
+export type SkillsIndex = {
+  version: string;
+  built_at: string;
+  builder_version: string;
+  skills: SkillIndexEntry[];
+};
+
+export function loadIndex(projectRoot: string): { indexPath: string; index: SkillsIndex } {
   const indexPath = join(getSkillsRoot(projectRoot), "INDEX.json");
   if (!existsSync(indexPath)) {
     throw new Error(`Missing ${indexPath}. Run: flowctl skills build-index`);
   }
-  const index = JSON.parse(readFileSync(indexPath, "utf8")) as unknown;
+  const index = JSON.parse(readFileSync(indexPath, "utf8")) as SkillsIndex;
   return { indexPath, index };
+}
+
+export type SkillMetaFilters = {
+  role?: string | null;
+  tag?: string | null;
+  trigger?: string | null;
+};
+
+export function filterSkillsByMeta(
+  skills: SkillIndexEntry[],
+  filters: SkillMetaFilters,
+): SkillIndexEntry[] {
+  let out = skills;
+  const { role, tag, trigger } = filters;
+  if (role) {
+    out = out.filter(
+      (s) =>
+        !Array.isArray(s.roles_suggested) ||
+        s.roles_suggested.length === 0 ||
+        s.roles_suggested.includes(role),
+    );
+  }
+  if (tag) {
+    out = out.filter((s) => Array.isArray(s.tags) && s.tags.includes(tag));
+  }
+  if (trigger) {
+    out = out.filter((s) => Array.isArray(s.triggers) && s.triggers.includes(trigger));
+  }
+  return out;
 }
 
 export function stripFrontmatter(content: string): string {
