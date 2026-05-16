@@ -910,7 +910,11 @@ cmd_approve() {
   fi
   # Invalidate MCP state cache + generate token report
   bash "$WORKFLOW_ROOT/scripts/hooks/invalidate-cache.sh" state 2>/dev/null || true
-  python3 "$WORKFLOW_ROOT/scripts/hooks/generate-token-report.py" --step "$step" 2>/dev/null || true
+  if command -v bun &>/dev/null && [[ -f "$WORKFLOW_ROOT/src/hooks/token-report.ts" ]]; then
+    (cd "$PROJECT_ROOT" && bun run "$WORKFLOW_ROOT/src/hooks/token-report.ts" -- --step "$step") 2>/dev/null || true
+  else
+    python3 "$WORKFLOW_ROOT/scripts/hooks/generate-token-report.py" --step "$step" 2>/dev/null || true
+  fi
 
   local manifest_rel="workflows/runtime/evidence/step-${step}-manifest.json"
   local trace_row

@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Ported wrapper (Phase 6): delegates to src/hooks/quality-gate.ts when Bun + file exist.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT"
+if command -v bun &>/dev/null && [[ -f "$ROOT/src/hooks/quality-gate.ts" ]]; then
+  exec bun run "$ROOT/src/hooks/quality-gate.ts" -- "$@"
+fi
 
 mode="ci"
 while [[ $# -gt 0 ]]; do
@@ -23,8 +29,8 @@ if [[ "$mode" == "local" ]]; then
 fi
 
 if [[ "$mode" == "ci" ]]; then
-  echo "[gate] Running CI quality gate: npm run test:ci:core"
-  npm run test:ci:core
+  echo "[gate] Running CI quality gate: npm run ci:gate"
+  npm run ci:gate
   exit 0
 fi
 
