@@ -31,6 +31,8 @@ import { runReleaseDashboard } from "@/commands/release-dashboard";
 import { runInit } from "@/commands/init";
 import { runMcp, type McpCliOptions } from "@/commands/mcp";
 import { runAuditTokens, type AuditTokensCliOptions } from "@/commands/audit-tokens";
+import { runMonitor } from "@/commands/monitor";
+import { sliceMonitorPassthrough } from "@/integrations/monitor-web-resolve";
 import { runComplexity } from "@/commands/complexity";
 import { runBudgetStatus } from "@/commands/budget";
 import { runWarRoom } from "@/commands/war-room";
@@ -683,6 +685,17 @@ program
       );
     },
   );
+
+program
+  .command("monitor")
+  .description("Telemetry dashboard — local HTTP + SSE (python scripts/monitor-web.py)")
+  .alias("mon")
+  .allowUnknownOption(true)
+  .allowExcessArguments(true)
+  .action(async () => {
+    const passthrough = sliceMonitorPassthrough(process.argv);
+    await runCommand("monitor", (ctx) => runMonitor(ctx, passthrough));
+  });
 
 program
   .command("mcp")
