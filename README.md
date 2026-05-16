@@ -51,7 +51,14 @@ npm i -g flowctl
 flowctl --help
 ```
 
-> Lưu ý: nếu muốn publish npm, cần bỏ `"private": true` trong `package.json`.
+### Engine TypeScript vs bash (Phase 8)
+
+- Mặc định `bin/flowctl` gọi `scripts/flowctl.sh` (bash).
+- `export FLOWCTL_ENGINE=ts` dùng engine TypeScript: ưu tiên binary đã compile trong `dist/flowctl-<platform>` (khi có), không thì `bun run src/cli/index.ts`. Cần **Bun** nếu chưa có prebuilt đúng OS/arch.
+- Bản phát hành: chạy `npm run build:all` (hoặc từng `build:linux-x64`, …) trước khi `npm pack` / publish để ship prebuilt. Linux/macOS được hỗ trợ qua shim; Windows native: dùng binary `dist/flowctl-win-x64.exe`, **WSL**, hoặc `bun run` từ source.
+- So sánh shadow bash vs TS: chuẩn hóa output/JSON qua `src/distribution/shadow-normalize.ts` (strip ANSI, timestamp, sort key JSON ổn định, giữ thứ tự mảng có nghĩa như `blockers`).
+
+> Lưu ý: khi publish npm, kiểm tra `private` / `publishConfig` trong `package.json` cho đúng registry.
 
 ## Cấu hình MCP (chuẩn mới)
 

@@ -219,10 +219,14 @@ print(str(Path('$tc06_dir') / sf) if sf else '')
 RESOLVED=$(FLOWCTL_PROJECT_ROOT="$tc06_dir" REPO_ROOT="$tc06_dir" \
   FLOWCTL_ACTIVE_FLOW="$FORK6" \
   python3 "$RESOLVER" | python3 -c "import json,sys; print(json.load(sys.stdin)['state_file'])")
-if [[ "$RESOLVED" == "$EXPECTED_SF" ]]; then
+# Compare canonical paths (macOS: /var/folders/... vs /private/var/folders/... same inode)
+if [[ -z "$EXPECTED_SF" || -z "$RESOLVED" ]]; then
+  fail 6 "empty path: RESOLVED='$RESOLVED' EXPECTED='$EXPECTED_SF'"
+elif python3 -c "import os,sys; sys.exit(0 if os.path.realpath(sys.argv[1])==os.path.realpath(sys.argv[2]) else 1)" \
+  "$RESOLVED" "$EXPECTED_SF"; then
   pass 6 "resolver with FLOWCTL_ACTIVE_FLOW=$FORK6 → correct state file"
 else
-  fail 6 "resolver returned '$RESOLVED', expected '$EXPECTED_SF'"
+  fail 6 "resolver returned '$RESOLVED', expected '$EXPECTED_SF' (realpath mismatch)"
 fi
 
 # ─────────────────────────────────────────────────────────────

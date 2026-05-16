@@ -16,12 +16,9 @@ describe("integration / bash regression (Phase 7 matrix)", () => {
     await runRepoBashTest("test-merge-cursor-mcp.sh");
   });
 
-  it.skipIf(process.platform === "darwin")(
-    "test-fork-parallel-isolation.sh (linux/ci: TC-06 path compare)",
-    async () => {
-      await runRepoBashTest("test-fork-parallel-isolation.sh");
-    },
-  );
+  it("test-fork-parallel-isolation.sh", async () => {
+    await runRepoBashTest("test-fork-parallel-isolation.sh");
+  });
 
   it("pytest tests/test_error_recovery.py", async () => {
     await execa("python3", ["-m", "pytest", "tests/test_error_recovery.py", "-q"], {

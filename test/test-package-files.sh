@@ -14,6 +14,7 @@ declared_files = set(package.get("files", []))
 
 required_runtime_files = [
     "bin",
+    "src",
     "scripts/flowctl.sh",
     "scripts/setup.sh",
     "scripts/merge_cursor_mcp.py",
@@ -37,7 +38,13 @@ required_runtime_files = [
 missing_from_package = [path for path in required_runtime_files if path not in declared_files]
 missing_on_disk      = [path for path in required_runtime_files if not Path(path).exists()]
 
+# Phase 8: prebuilt globs are declared for npm pack but not required on disk in dev clones.
+must_declare_in_package = ["dist/flowctl-*"]
+missing_declared_globs = [g for g in must_declare_in_package if g not in declared_files]
+
 errors = []
+if missing_declared_globs:
+    errors.append("Missing from package.json files: " + ", ".join(missing_declared_globs))
 if missing_from_package:
     errors.append("Missing from package.json files: " + ", ".join(missing_from_package))
 if missing_on_disk:

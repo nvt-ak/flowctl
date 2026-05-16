@@ -12,12 +12,34 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 WORKFLOW_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Prebuilt path for this OS/arch (release layout under dist/).
+flowctl_prebuilt_binary() {
+  local os arch bin
+  os="$(uname -s)"
+  arch="$(uname -m)"
+  bin=""
+  case "${os}-${arch}" in
+    Linux-x86_64) bin="$WORKFLOW_ROOT/dist/flowctl-linux-x64" ;;
+    Linux-aarch64|Linux-arm64) bin="$WORKFLOW_ROOT/dist/flowctl-linux-arm64" ;;
+    Darwin-x86_64) bin="$WORKFLOW_ROOT/dist/flowctl-darwin-x64" ;;
+    Darwin-arm64) bin="$WORKFLOW_ROOT/dist/flowctl-darwin-arm64" ;;
+    *) bin="" ;;
+  esac
+  printf '%s' "$bin"
+}
+
+# TypeScript engine: prefer platform binary, then Bun source (Phase 8 dual-mode / shadow).
 if [[ "${FLOWCTL_ENGINE:-}" == "ts" ]]; then
+  BIN="$(flowctl_prebuilt_binary)"
+  if [[ -n "$BIN" && -x "$BIN" ]]; then
+    exec "$BIN" "$@"
+  fi
   if command -v bun >/dev/null 2>&1; then
     exec bun run "$WORKFLOW_ROOT/src/cli/index.ts" "$@"
   fi
-  echo "[flowctl] FLOWCTL_ENGINE=ts requires bun on PATH" >&2
+  echo "[flowctl] FLOWCTL_ENGINE=ts requires a prebuilt binary in dist/ for this platform or bun on PATH" >&2
   exit 1
 fi
 
+# Default engine: bash implementation (cutover flips this to TS later per migration plan).
 exec bash "$WORKFLOW_ROOT/scripts/flowctl.sh" "$@"
